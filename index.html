@@ -1,0 +1,1344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Morning Routine">
+  <title>Morning Routine</title>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@500;700;800;900&display=swap" rel="stylesheet">
+</head>
+<body style="margin:0;padding:0;background:#1a0a2e;">
+
+<div id="mrw"></div>
+
+<style>
+  :root {
+    --sun:    #ffb347;
+    --amber:  #ff8c42;
+    --coral:  #ff6b6b;
+    --mint:   #56e39f;
+    --sky:    #4fc3f7;
+    --purple: #7c5cbf;
+    --deep:   #1a0a2e;
+    --stroke:  rgba(255,255,255,.15);
+    --text:    #fff;
+    --muted:   rgba(255,255,255,.65);
+    --radius:  26px;
+  }
+
+  * { box-sizing: border-box; }
+
+  /* ── Scrolling star field ── */
+  #mrw-stars {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    overflow: hidden;
+  }
+  #mrw-stars span {
+    position: absolute;
+    border-radius: 50%;
+    background: #fff;
+    animation: twinkle var(--dur, 3s) ease-in-out infinite var(--delay, 0s);
+    opacity: 0;
+  }
+  @keyframes twinkle {
+    0%,100% { opacity: 0; transform: scale(1); }
+    50%      { opacity: var(--op, .6); transform: scale(1.4); }
+  }
+
+  #mrw {
+    font-family: 'Nunito', sans-serif;
+    color: var(--text);
+    position: relative;
+    z-index: 1;
+  }
+  #mrw * { box-sizing: border-box; }
+
+  /* ── Wrap / background ── */
+  #mrw .wrap {
+    min-height: 100vh;
+    min-height: -webkit-fill-available;
+    padding: 16px;
+    padding-top: max(16px, env(safe-area-inset-top));
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
+    background:
+      radial-gradient(ellipse 1000px 500px at 50% -10%, rgba(255,160,60,.35), transparent),
+      radial-gradient(ellipse 700px 600px at 10%  80%, rgba(124,92,191,.40), transparent),
+      radial-gradient(ellipse 600px 500px at 90%  70%, rgba(79,195,247,.20), transparent),
+      linear-gradient(180deg, #2d0f5c 0%, #1a0a2e 55%, #0d0820 100%);
+  }
+
+  /* ── Card ── */
+  #mrw .card {
+    width: min(1020px, 100%);
+    margin: 0 auto;
+    border-radius: var(--radius);
+    border: 1px solid rgba(255,255,255,.12);
+    background: rgba(255,255,255,.06);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    box-shadow:
+      0 32px 80px rgba(0,0,0,.5),
+      0 0 0 1px rgba(255,255,255,.05) inset,
+      0 1px 0 rgba(255,255,255,.18) inset;
+    overflow: hidden;
+  }
+
+  /* ── Header ── */
+  #mrw .header {
+    padding: 16px 18px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    background: rgba(255,255,255,.04);
+    border-bottom: 1px solid rgba(255,255,255,.08);
+  }
+  #mrw .hleft { display: grid; gap: 3px; }
+  #mrw .title {
+    font-family: 'Fredoka', sans-serif;
+    font-weight: 700;
+    font-size: 22px;
+    letter-spacing: .02em;
+    background: linear-gradient(90deg, var(--sun), var(--coral));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  #mrw .sub {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--muted);
+  }
+  #mrw .hright {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  /* ── Buttons ── */
+  #mrw button {
+    font-family: 'Nunito', sans-serif;
+    font-weight: 800;
+    font-size: 14px;
+    color: #fff;
+    border: none;
+    border-radius: 14px;
+    padding: 10px 14px;
+    cursor: pointer;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    transition: transform .1s ease, box-shadow .1s ease;
+    background: rgba(255,255,255,.14);
+    box-shadow: 0 4px 0 rgba(0,0,0,.3), 0 1px 0 rgba(255,255,255,.1) inset;
+  }
+  #mrw button:active { transform: translateY(3px); box-shadow: 0 1px 0 rgba(0,0,0,.3); }
+
+  #mrw button.primary {
+    background: linear-gradient(160deg, #ffb347, #ff6b35);
+    box-shadow: 0 4px 0 #b84c00, 0 1px 0 rgba(255,255,255,.25) inset;
+    text-shadow: 0 1px 2px rgba(0,0,0,.3);
+  }
+  #mrw button.primary:active { box-shadow: 0 1px 0 #b84c00; }
+
+  #mrw button.greenBtn {
+    background: linear-gradient(160deg, #56e39f, #22c55e);
+    box-shadow: 0 4px 0 #16803a, 0 1px 0 rgba(255,255,255,.25) inset;
+    text-shadow: 0 1px 2px rgba(0,0,0,.2);
+  }
+  #mrw button.greenBtn:active { box-shadow: 0 1px 0 #16803a; }
+
+  #mrw button.icon {
+    width: 44px; height: 44px;
+    padding: 0;
+    display: grid;
+    place-items: center;
+    font-size: 20px;
+    border-radius: 50%;
+    background: rgba(255,255,255,.1);
+    box-shadow: 0 3px 0 rgba(0,0,0,.25), 0 1px 0 rgba(255,255,255,.1) inset;
+  }
+  #mrw button.undo {
+    background: rgba(255,255,255,.07);
+    box-shadow: 0 3px 0 rgba(0,0,0,.2);
+    font-size: 12px;
+    opacity: .75;
+  }
+  #mrw button.undo:disabled { opacity: .25; cursor: not-allowed; transform: none !important; }
+
+  /* ── Ball badge ── */
+  #mrw .ballBadge {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: linear-gradient(135deg, rgba(255,179,71,.25), rgba(255,107,107,.15));
+    border: 1px solid rgba(255,179,71,.4);
+    border-radius: 999px;
+    padding: 7px 14px;
+    font-family: 'Fredoka', sans-serif;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--sun);
+    box-shadow: 0 2px 8px rgba(255,140,66,.2);
+  }
+
+  /* ── Layout ── */
+  #mrw .body { padding: 16px; display: grid; gap: 14px; }
+  #mrw .top { display: grid; grid-template-columns: 1.3fr .7fr; gap: 14px; }
+  @media (max-width: 820px) { #mrw .top { grid-template-columns: 1fr; } }
+
+  /* ── NOW panel ── */
+  #mrw .now {
+    border-radius: 22px;
+    border: 1px solid rgba(255,179,71,.25);
+    background: linear-gradient(145deg, rgba(255,140,66,.18), rgba(255,107,107,.10), rgba(124,92,191,.12));
+    padding: 18px;
+    display: grid;
+    gap: 14px;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 0 40px rgba(255,140,66,.1) inset, 0 8px 32px rgba(0,0,0,.25);
+  }
+  #mrw .now::before {
+    content: "";
+    position: absolute;
+    top: -60px; right: -60px;
+    width: 200px; height: 200px;
+    background: radial-gradient(circle, rgba(255,179,71,.35), transparent 65%);
+    pointer-events: none;
+    animation: orbPulse 4s ease-in-out infinite;
+  }
+  @keyframes orbPulse {
+    0%,100% { transform: scale(1); opacity: .8; }
+    50%      { transform: scale(1.15); opacity: 1; }
+  }
+
+  #mrw .nowTop {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    position: relative;
+    z-index: 1;
+  }
+  #mrw .bigIcon {
+    font-size: 100px;
+    line-height: 1;
+    user-select: none;
+    filter: drop-shadow(0 8px 20px rgba(0,0,0,.4)) drop-shadow(0 0 30px rgba(255,200,100,.3));
+    animation: iconFloat 3s ease-in-out infinite;
+    flex-shrink: 0;
+  }
+  @keyframes iconFloat {
+    0%,100% { transform: translateY(0); }
+    50%      { transform: translateY(-7px); }
+  }
+
+  #mrw .nowMeta { flex: 1; min-width: 0; display: grid; gap: 10px; }
+  #mrw .stepName {
+    font-family: 'Fredoka', sans-serif;
+    font-weight: 600;
+    font-size: 24px;
+    line-height: 1.1;
+    color: #fff;
+    text-shadow: 0 2px 8px rgba(0,0,0,.4);
+  }
+  #mrw .timeLeft {
+    font-family: 'Fredoka', sans-serif;
+    font-weight: 700;
+    font-size: 58px;
+    letter-spacing: .04em;
+    line-height: 1;
+    color: #fff;
+    text-shadow: 0 0 30px rgba(255,200,100,.6), 0 4px 12px rgba(0,0,0,.5);
+  }
+
+  /* ── Progress bar ── */
+  #mrw .barWrap { display: grid; gap: 6px; }
+  #mrw .barLabel { font-size: 10px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+  #mrw .barTrack {
+    height: 22px;
+    border-radius: 999px;
+    background: rgba(0,0,0,.3);
+    border: 1px solid rgba(255,255,255,.1);
+    overflow: hidden;
+    box-shadow: 0 2px 6px rgba(0,0,0,.3) inset;
+    position: relative;
+  }
+  #mrw .barFill {
+    height: 100%;
+    width: 0%;
+    border-radius: 999px;
+    background: linear-gradient(90deg,
+      #22c55e 0%, #22c55e 50%,
+      #eab308 50%, #eab308 75%,
+      #ef4444 75%, #ef4444 100%);
+    transition: width 220ms linear;
+    position: relative;
+    box-shadow: 0 0 12px rgba(34,197,94,.5);
+  }
+  #mrw .barFill::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,.3) 50%, transparent 100%);
+    background-size: 200% 100%;
+    animation: shimmer 2s linear infinite;
+  }
+  @keyframes shimmer {
+    0%   { background-position: -200% 0; }
+    100% { background-position:  200% 0; }
+  }
+
+  /* ── CTA row ── */
+  #mrw .ctaRow { display: flex; gap: 8px; flex-wrap: wrap; position: relative; z-index: 1; }
+  #mrw .ctaRow button { flex: 1; min-width: 80px; padding: 15px 10px; border-radius: 16px; font-size: 15px; }
+
+  /* ── Side panel ── */
+  #mrw .side {
+    border-radius: 22px;
+    border: 1px solid rgba(255,255,255,.1);
+    background: rgba(255,255,255,.05);
+    padding: 14px;
+    display: grid;
+    gap: 10px;
+    align-content: start;
+    box-shadow: 0 8px 32px rgba(0,0,0,.2);
+  }
+
+  /* ── Pills ── */
+  #mrw .pill {
+    border-radius: 16px;
+    padding: 12px 14px;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 12px;
+    align-items: center;
+    border: 1px solid rgba(255,255,255,.1);
+    background: rgba(255,255,255,.06);
+    transition: background .2s;
+  }
+  #mrw .pill.nextPill {
+    background: linear-gradient(135deg, rgba(79,195,247,.15), rgba(124,92,191,.12));
+    border-color: rgba(79,195,247,.25);
+  }
+  #mrw .pill.ballPill {
+    background: linear-gradient(135deg, rgba(255,179,71,.18), rgba(255,107,107,.10));
+    border-color: rgba(255,179,71,.3);
+  }
+  #mrw .pillIcon { font-size: 32px; line-height: 1; }
+  #mrw .pillText { font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 15px; }
+  #mrw .pillSub { font-size: 12px; font-weight: 700; color: var(--muted); margin-top: 2px; }
+
+  /* ── Tile grid ── */
+  #mrw .gridLabel {
+    font-family: 'Fredoka', sans-serif;
+    font-weight: 600;
+    font-size: 14px;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 0 2px;
+  }
+  #mrw .grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0,1fr));
+    gap: 10px;
+  }
+  @media (max-width: 720px) { #mrw .grid { grid-template-columns: repeat(3, minmax(0,1fr)); } }
+  @media (max-width: 480px) { #mrw .grid { grid-template-columns: repeat(2, minmax(0,1fr)); } }
+
+  #mrw .tile {
+    position: relative;
+    border-radius: 20px;
+    min-height: 112px;
+    display: grid;
+    place-items: center;
+    gap: 8px;
+    user-select: none;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    overflow: hidden;
+    transition: transform .1s ease, box-shadow .1s ease;
+    cursor: pointer;
+    background: linear-gradient(160deg, rgba(255,255,255,.12), rgba(255,255,255,.06));
+    border: 1px solid rgba(255,255,255,.14);
+    box-shadow: 0 6px 0 rgba(0,0,0,.35), 0 12px 24px rgba(0,0,0,.2), 0 1px 0 rgba(255,255,255,.12) inset;
+  }
+  #mrw .tile:active { transform: translateY(5px); box-shadow: 0 1px 0 rgba(0,0,0,.35); }
+
+  /* ACTIVE */
+  #mrw .tile[data-state="active"] {
+    background: linear-gradient(160deg, rgba(255,179,71,.35), rgba(255,107,107,.22));
+    border-color: rgba(255,179,71,.55);
+    box-shadow: 0 6px 0 rgba(180,80,0,.5), 0 12px 30px rgba(255,140,66,.25), 0 0 0 2px rgba(255,179,71,.4), 0 1px 0 rgba(255,255,255,.2) inset;
+    animation: activePulse 2s ease-in-out infinite;
+  }
+  @keyframes activePulse {
+    0%,100% { box-shadow: 0 6px 0 rgba(180,80,0,.5), 0 12px 30px rgba(255,140,66,.2), 0 0 0 2px rgba(255,179,71,.35), 0 1px 0 rgba(255,255,255,.2) inset; }
+    50%      { box-shadow: 0 6px 0 rgba(180,80,0,.5), 0 16px 40px rgba(255,140,66,.4), 0 0 0 3px rgba(255,179,71,.6), 0 1px 0 rgba(255,255,255,.2) inset; }
+  }
+  #mrw .tile[data-state="active"] .tileIcon { animation: iconBounce 1.5s ease-in-out infinite; }
+  @keyframes iconBounce {
+    0%,100% { transform: scale(1) translateY(0); }
+    50%      { transform: scale(1.08) translateY(-3px); }
+  }
+
+  /* DONE */
+  #mrw .tile[data-state="done"] {
+    background: linear-gradient(160deg, rgba(34,197,94,.14), rgba(34,197,94,.07));
+    border-color: rgba(34,197,94,.25);
+    box-shadow: 0 4px 0 rgba(0,0,0,.25), 0 6px 16px rgba(0,0,0,.15);
+    opacity: .72;
+  }
+
+  #mrw .tileIcon {
+    font-size: 44px;
+    line-height: 1;
+    filter: drop-shadow(0 6px 10px rgba(0,0,0,.35));
+    transition: transform .2s;
+  }
+  #mrw .tile:not([data-state="done"]):hover .tileIcon { transform: scale(1.1); }
+
+  #mrw .tileLabel {
+    font-family: 'Fredoka', sans-serif;
+    font-weight: 600;
+    font-size: 13px;
+    text-align: center;
+    color: rgba(255,255,255,.85);
+    line-height: 1.2;
+    padding: 0 4px;
+  }
+  #mrw[data-labels="off"] .tileLabel { display: none; }
+
+  /* checkmark badge */
+  #mrw .tileDone {
+    position: absolute;
+    top: 8px; right: 8px;
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #56e39f, #22c55e);
+    display: none;
+    place-items: center;
+    font-size: 12px;
+    box-shadow: 0 2px 6px rgba(0,0,0,.25);
+  }
+  #mrw .tile[data-state="done"] .tileDone { display: grid; }
+
+  /* ── Sparkle ── */
+  #mrw .spark {
+    position: absolute;
+    left: 50%; top: 50%;
+    width: 10px; height: 10px;
+    transform: translate(-50%,-50%);
+    pointer-events: none;
+  }
+  #mrw .spark i {
+    position: absolute;
+    opacity: 0;
+    animation: sparkFly 700ms ease-out forwards;
+  }
+  #mrw .spark i::before {
+    content: "★";
+    display: block;
+    font-size: 20px;
+    transform: translate(-5px,-9px) scale(var(--s));
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,.3));
+  }
+  @keyframes sparkFly {
+    0%   { opacity:0; transform: rotate(var(--r)) translateX(0); }
+    15%  { opacity:1; }
+    100% { opacity:0; transform: rotate(var(--r)) translateX(var(--d)); }
+  }
+
+  /* ── Settings modal ── */
+  #mrw .modal {
+    position: fixed; inset: 0; display: none;
+    place-items: center;
+    background: rgba(0,0,0,.7);
+    z-index: 999999; padding: 16px;
+    backdrop-filter: blur(4px);
+  }
+  #mrw .modalCard {
+    width: min(480px, 100%);
+    border-radius: 26px;
+    border: 1px solid rgba(255,255,255,.15);
+    background: rgba(26,16,60,.96);
+    backdrop-filter: blur(20px);
+    box-shadow: 0 32px 80px rgba(0,0,0,.6);
+    padding: 22px;
+    display: grid; gap: 12px;
+  }
+  #mrw .modalTitle { font-family: 'Fredoka', sans-serif; font-weight: 700; font-size: 22px; color: var(--sun); }
+  #mrw .row { display: flex; gap: 10px; flex-wrap: wrap; }
+  #mrw .row button { flex: 1; min-width: 130px; padding: 13px 12px; border-radius: 14px; }
+  #mrw .modalTip { font-size: 12px; font-weight: 700; color: var(--muted); background: rgba(255,255,255,.05); border-radius: 12px; padding: 10px 14px; }
+
+  /* ── Reward overlay ── */
+  #mrw .reward {
+    position: fixed; inset: 0; display: none;
+    place-items: center;
+    z-index: 999999; padding: 16px;
+    overflow: hidden;
+    /* rainbow burst background */
+    background: radial-gradient(ellipse 120% 80% at 50% 110%,
+      #ff6b6b 0%, #ffb347 18%, #ffe066 34%,
+      #56e39f 50%, #4fc3f7 66%, #a78bfa 82%, #f472b6 100%);
+    animation: rewardBgIn .5s ease forwards;
+  }
+  @keyframes rewardBgIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+
+  /* Firework rockets that shoot up from bottom */
+  #mrw .fireworks { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+  #mrw .rocket {
+    position: absolute;
+    bottom: -20px;
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    animation: rocketUp var(--dur,.8s) ease-out var(--delay,0s) forwards;
+  }
+  @keyframes rocketUp {
+    0%   { transform: translateY(0) scale(1); opacity: 1; }
+    80%  { opacity: 1; }
+    100% { transform: translateY(var(--travel,-600px)) scale(0); opacity: 0; }
+  }
+  #mrw .burst {
+    position: absolute;
+    bottom: var(--by, 30%);
+    left: var(--bx, 50%);
+    width: 0; height: 0;
+    pointer-events: none;
+    animation: none;
+  }
+  #mrw .burst span {
+    position: absolute;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--c, #fff);
+    transform: rotate(var(--r,0deg)) translateX(0);
+    animation: burstOut var(--dur,.6s) ease-out var(--delay,0s) both;
+  }
+  @keyframes burstOut {
+    0%   { transform: rotate(var(--r)) translateX(0); opacity: 1; }
+    100% { transform: rotate(var(--r)) translateX(var(--d,60px)); opacity: 0; }
+  }
+
+  /* Emoji rain */
+  #mrw .emojiRain { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+  #mrw .rainDrop {
+    position: absolute;
+    top: -60px;
+    font-size: var(--sz, 28px);
+    animation: rainFall var(--dur,2s) linear var(--delay,0s) both;
+    user-select: none;
+  }
+  @keyframes rainFall {
+    0%   { transform: translateY(0) rotate(0deg); opacity: 0; }
+    10%  { opacity: 1; }
+    90%  { opacity: 1; }
+    100% { transform: translateY(110vh) rotate(var(--spin,360deg)); opacity: 0; }
+  }
+
+  /* Card */
+  #mrw .rewardCard {
+    width: min(580px, 100%);
+    border-radius: 34px;
+    border: 3px solid rgba(255,255,255,.7);
+    background: #fff;
+    color: rgba(0,0,0,.88);
+    box-shadow: 0 0 0 8px rgba(255,255,255,.25), 0 40px 100px rgba(0,0,0,.4);
+    padding: 30px 24px 24px;
+    display: grid; gap: 10px;
+    place-items: center;
+    position: relative; overflow: hidden;
+    animation: cardPop .5s cubic-bezier(.17,.67,.3,1.4) .1s both;
+    z-index: 2;
+  }
+  @keyframes cardPop {
+    from { transform: scale(.4); opacity: 0; }
+    to   { transform: scale(1);  opacity: 1; }
+  }
+  /* rainbow shimmer top strip */
+  #mrw .rewardCard::before {
+    content: "";
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 8px;
+    background: linear-gradient(90deg, #ff6b6b, #ffb347, #ffe066, #56e39f, #4fc3f7, #a78bfa, #f472b6);
+    animation: shimmerStrip 2s linear infinite;
+    background-size: 200% 100%;
+  }
+  @keyframes shimmerStrip {
+    0%   { background-position: 0% 0; }
+    100% { background-position: 200% 0; }
+  }
+
+  #mrw .rewardEmoji {
+    font-size: 72px;
+    line-height: 1;
+    animation: trophyBounce 1s cubic-bezier(.17,.67,.3,1.4) .3s both;
+    filter: drop-shadow(0 8px 16px rgba(0,0,0,.2));
+  }
+  @keyframes trophyBounce {
+    from { transform: scale(0) rotate(-20deg); opacity: 0; }
+    to   { transform: scale(1) rotate(0deg); opacity: 1; }
+  }
+
+  #mrw .rewardTitle {
+    font-family: 'Fredoka', sans-serif;
+    font-weight: 700;
+    font-size: 34px;
+    background: linear-gradient(135deg, #ff6b35, #ff3d7f, #a855f7);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    text-align: center;
+    animation: titleSlideIn .45s ease .5s both;
+    line-height: 1.1;
+  }
+  @keyframes titleSlideIn {
+    from { transform: translateY(16px); opacity: 0; }
+    to   { transform: translateY(0);    opacity: 1; }
+  }
+
+  #mrw .rewardSub {
+    font-weight: 800;
+    font-size: 16px;
+    color: rgba(0,0,0,.55);
+    text-align: center;
+    animation: titleSlideIn .45s ease .65s both;
+  }
+
+  #mrw .rewardBalls {
+    font-family: 'Fredoka', sans-serif;
+    font-weight: 700;
+    font-size: 22px;
+    background: linear-gradient(135deg, #ff8c42, #ffb347);
+    color: #fff;
+    border-radius: 999px;
+    padding: 10px 28px;
+    box-shadow: 0 4px 0 #b85c00, 0 8px 20px rgba(255,140,66,.4);
+    animation: titleSlideIn .45s ease .8s both, ballBadgePulse 2s ease 1.5s infinite;
+    position: relative;
+    z-index: 1;
+  }
+  @keyframes ballBadgePulse {
+    0%,100% { transform: scale(1); box-shadow: 0 4px 0 #b85c00, 0 8px 20px rgba(255,140,66,.4); }
+    50%      { transform: scale(1.05); box-shadow: 0 4px 0 #b85c00, 0 12px 30px rgba(255,140,66,.6); }
+  }
+
+  /* Jar ── */
+  #mrw .jarArea {
+    position: relative;
+    width: 220px; height: 270px;
+    animation: jarSlideIn .5s ease .4s both;
+    z-index: 1;
+  }
+  @keyframes jarSlideIn {
+    from { transform: translateY(30px); opacity: 0; }
+    to   { transform: translateY(0); opacity: 1; }
+  }
+  #mrw .jar {
+    position: absolute; bottom: 0; width: 220px; height: 210px;
+    border: 7px solid rgba(80,50,0,.5); border-top: none;
+    border-radius: 0 0 44px 44px;
+    background: linear-gradient(180deg, rgba(255,245,220,.9), rgba(255,230,170,.6));
+    box-shadow: inset 0 14px 22px rgba(0,0,0,.05), 0 6px 20px rgba(0,0,0,.12);
+    overflow: hidden;
+  }
+  #mrw .jar::before {
+    content:""; position:absolute; top:-18px; left:18px;
+    width:184px; height:22px;
+    border:7px solid rgba(80,50,0,.5); border-bottom:none;
+    border-radius:26px 26px 8px 8px;
+    background:rgba(255,245,220,.8);
+  }
+  /* glass shine */
+  #mrw .jar::after {
+    content:""; position:absolute; top:8px; left:14px;
+    width:18px; height:80px;
+    background: linear-gradient(180deg, rgba(255,255,255,.55), rgba(255,255,255,.1));
+    border-radius:99px; transform:rotate(-6deg);
+  }
+  #mrw .jarFill {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    display: flex; flex-wrap: wrap; align-content: flex-end;
+    padding: 5px; gap: 2px; pointer-events: none;
+  }
+  #mrw .jarBall {
+    width: 22px; height: 22px; border-radius: 50%; flex-shrink: 0;
+    background:
+      radial-gradient(circle at 32% 28%, rgba(255,255,255,.95) 10%, transparent 45%),
+      linear-gradient(135deg, #ffd08a, #ff8c1a);
+    box-shadow: 0 2px 4px rgba(0,0,0,.2), inset 0 -3px 0 rgba(0,0,0,.1);
+  }
+  /* New ball that drops in */
+  #mrw .ball {
+    position: absolute; top: -80px; left: 87px;
+    width: 44px; height: 44px; border-radius: 50%;
+    background:
+      radial-gradient(circle at 32% 28%, rgba(255,255,255,.95) 12%, transparent 45%),
+      linear-gradient(135deg, #ffd08a, #ff9f1c);
+    box-shadow: 0 14px 20px rgba(0,0,0,.22), inset -7px -9px 0 rgba(0,0,0,.08), inset 7px 9px 0 rgba(255,255,255,.18);
+    z-index: 2;
+  }
+  #mrw .ball.play { animation: dropBall 1.7s cubic-bezier(.2,.9,.2,1) forwards; }
+  @keyframes dropBall {
+    0%   { transform: translateY(0)   scale(1); }
+    60%  { transform: translateY(198px) scale(1.03); }
+    74%  { transform: translateY(162px) scale(0.98); }
+    86%  { transform: translateY(208px) scale(1.01); }
+    100% { transform: translateY(198px) scale(1); }
+  }
+
+  /* Confetti ── */
+  #mrw .confetti { position:absolute; left:50%; top:40%; width:10px; height:10px; transform:translate(-50%,-50%); pointer-events:none; }
+  #mrw .confetti b { position:absolute; width:11px; height:7px; border-radius:3px; opacity:0; animation:confettiFly 950ms ease-out forwards; }
+  @keyframes confettiFly {
+    0%   { opacity:0; transform:rotate(var(--r)) translateX(0) translateY(0) scale(1); }
+    15%  { opacity:1; }
+    100% { opacity:0; transform:rotate(var(--r)) translateX(var(--d)) translateY(var(--y)) scale(.85); }
+  }
+</style>
+
+<script>
+(function () {
+  const ZIP_CODE = "87123";
+  const JACKET_THRESHOLD_F = 50;
+  const TOTAL_BUDGET_SECONDS   = 30 * 60;
+  const BUFFER_DEFAULT_SECONDS =  5 * 60;
+  const DEFAULT_LABELS = "off";
+  const DEFAULT_SOUND  = "on";
+  const DEFAULT_VOICE  = "on";
+
+  const STEPS_BASE = [
+    { id:"getdressed", icon:"👕", label:"Get dressed",  speak:"Alright, let's go! First up — get dressed. You've got this!",                               seconds:10*60 },
+    { id:"brushteeth", icon:"🪥", label:"Brush teeth",  speak:"Great job! Now let's brush those teeth. Two whole minutes — make them sparkle!",             seconds: 3*60 },
+    { id:"shoes",      icon:"👟", label:"Shoes",        speak:"Awesome! Time to put your shoes on. Don't forget to tie them up tight!",                     seconds: 2*60 },
+    { id:"snack",      icon:"🍌", label:"Snack",        speak:"You're doing amazing! Go grab your snack — you'll need that energy today!",                   seconds: 2*60 },
+    { id:"water",      icon:"🥤", label:"Water",        speak:"Almost there! Grab your water bottle. Staying hydrated is super important!",                  seconds: 2*60 },
+    { id:"backpack",   icon:"🎒", label:"Backpack",     speak:"So close! Go get your backpack all packed up and ready to go!",                               seconds: 2*60 },
+    { id:"jacket",     icon:"🧥", label:"Jacket",       speak:"Last one! It's a bit chilly out there, so grab your jacket. You're crushing it!",             seconds: 2*60, weatherControlled:true }
+  ];
+
+  const TIME_ALERTS = [
+    { secs:120, phrase:"Two minutes left — keep it up, you're doing great!" },
+    { secs:60,  phrase:"One minute! You've totally got this, almost done!"  },
+    { secs:30,  phrase:"Thirty seconds — go go go, you're so close!"        }
+  ];
+
+  const K_STATE      = "mrw_state_v2";
+  const K_LAST_RESET = "mrw_last_reset_v2";
+  const K_LABELS     = "mrw_labels_v2";
+  const K_SOUND      = "mrw_sound_v2";
+  const K_VOICE      = "mrw_voice_v2";
+  const K_GEO        = "mrw_geo_zip87123_v2";
+  const K_WX         = "mrw_wx_zip87123_v2";
+  const K_BALLS      = "mrw_balls_total_v1";
+
+  const mount = document.getElementById("mrw");
+  if (!mount) return;
+
+  let audioCtx = null, tickTimer = null, speechKeepAlive = null;
+
+  /* ── Star field ── */
+  function buildStarField() {
+    const el = document.createElement("div"); el.id = "mrw-stars";
+    for (let i = 0; i < 70; i++) {
+      const s = document.createElement("span");
+      const sz = 1 + Math.random() * 2.5;
+      s.style.cssText = `left:${Math.random()*100}%;top:${Math.random()*100}%;width:${sz}px;height:${sz}px;--op:${.3+Math.random()*.6};--dur:${2+Math.random()*4}s;--delay:${-Math.random()*6}s;`;
+      el.appendChild(s);
+    }
+    document.body.insertBefore(el, document.body.firstChild);
+  }
+
+  /* ── Date ── */
+  function todayKeyLocal() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+  }
+  function resetForNewDayIfNeeded() {
+    const today = todayKeyLocal();
+    if (localStorage.getItem(K_LAST_RESET) !== today) { localStorage.setItem(K_LAST_RESET,today); localStorage.removeItem(K_STATE); }
+  }
+  function scheduleMidnightReset() {
+    const now=new Date(), next=new Date(now); next.setHours(24,0,0,0);
+    setTimeout(()=>{ localStorage.setItem(K_LAST_RESET,todayKeyLocal()); localStorage.removeItem(K_STATE); location.reload(); }, next-now);
+  }
+
+  /* ── Storage ── */
+  function loadJSON(k,fb){ try{return JSON.parse(localStorage.getItem(k)||"");}catch{return fb;} }
+  function saveJSON(k,o){ localStorage.setItem(k,JSON.stringify(o)); }
+  function labelsOn(){ return (localStorage.getItem(K_LABELS)||DEFAULT_LABELS)==="on"; }
+  function soundOn(){  return (localStorage.getItem(K_SOUND) ||DEFAULT_SOUND) ==="on"; }
+  function voiceOn(){  return (localStorage.getItem(K_VOICE) ||DEFAULT_VOICE) ==="on"; }
+  function getBalls(){ return parseInt(localStorage.getItem(K_BALLS)||"0",10); }
+  function addBall(){  const n=getBalls()+1; localStorage.setItem(K_BALLS,String(n)); return n; }
+
+  /* ── Audio ── */
+  function ensureAudioReady() {
+    if (!soundOn()) return false;
+    const AC=window.AudioContext||window.webkitAudioContext; if(!AC) return false;
+    if (!audioCtx) audioCtx=new AC();
+    if (audioCtx.state==="suspended") try{audioCtx.resume();}catch{}
+    return true;
+  }
+  function playClapOnce(when=0) {
+    if (!ensureAudioReady()) return;
+    const ctx=audioCtx,sz=Math.floor(ctx.sampleRate*.12),buf=ctx.createBuffer(1,sz,ctx.sampleRate),d=buf.getChannelData(0);
+    for(let i=0;i<sz;i++) d[i]=(Math.random()*2-1)*Math.pow(1-i/sz,6)*.95;
+    const src=ctx.createBufferSource(); src.buffer=buf;
+    const f=ctx.createBiquadFilter(); f.type="bandpass"; f.frequency.value=1900; f.Q.value=.9;
+    const g=ctx.createGain(); g.gain.value=.38;
+    src.connect(f);f.connect(g);g.connect(ctx.destination);src.start(ctx.currentTime+when);
+  }
+  function playClapSequence(){ playClapOnce(0);playClapOnce(.13);playClapOnce(.26); }
+  function playTinyDing() {
+    if (!ensureAudioReady()) return;
+    const ctx=audioCtx,osc=ctx.createOscillator(),g=ctx.createGain();
+    osc.type="sine";osc.frequency.value=880;
+    const t=ctx.currentTime;
+    g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(.16,t+.01);g.gain.exponentialRampToValueAtTime(.0001,t+.20);
+    osc.connect(g);g.connect(ctx.destination);osc.start(t);osc.stop(t+.22);
+  }
+  function playSpeedDing() {
+    if (!ensureAudioReady()) return;
+    [1047,1319,1568].forEach((freq,i)=>{
+      const ctx=audioCtx,osc=ctx.createOscillator(),g=ctx.createGain();
+      osc.type="sine";osc.frequency.value=freq;
+      const t=ctx.currentTime+i*.12;
+      g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(.18,t+.01);g.gain.exponentialRampToValueAtTime(.0001,t+.22);
+      osc.connect(g);g.connect(ctx.destination);osc.start(t);osc.stop(t+.25);
+    });
+  }
+
+  /* ── Speech — warm teacher voice (iOS-safe) ── */
+
+  // Preferred voices in order — these are the warmest, most natural-sounding
+  // voices available on iOS/macOS/Windows. We pick the first match found.
+  const PREFERRED_VOICES = [
+    "Ava (Enhanced)",    // iOS 17+ neural — best by far
+    "Ava",               // iOS neural fallback
+    "Samantha (Enhanced)",
+    "Samantha",          // classic iOS warm female voice
+    "Karen",             // Australian, warm
+    "Moira",             // Irish, warm
+    "Nicky",             // iOS en-US
+    "Joanna",            // Amazon-style, often present
+    "Zira",              // Windows warm female
+    "Microsoft Zira",
+    "Google US English", // Android/Chrome
+  ];
+
+  let _pickedVoice = null;
+  let _voicePickAttempts = 0;
+
+  function pickBestVoice() {
+    if (_pickedVoice) return _pickedVoice;
+    const voices = window.speechSynthesis.getVoices();
+    if (!voices.length) return null;
+
+    // Try preferred list first
+    for (const name of PREFERRED_VOICES) {
+      const v = voices.find(v => v.name === name);
+      if (v) { _pickedVoice = v; return v; }
+    }
+    // Fallback: any en-US female-ish voice
+    const enUS = voices.find(v => v.lang === "en-US" && !v.name.toLowerCase().includes("male"));
+    if (enUS) { _pickedVoice = enUS; return enUS; }
+    // Last resort: any English voice
+    const en = voices.find(v => v.lang.startsWith("en"));
+    if (en) { _pickedVoice = en; return en; }
+    return null;
+  }
+
+  // Pre-load voices as soon as possible — iOS loads them async
+  if (window.speechSynthesis) {
+    window.speechSynthesis.getVoices(); // triggers load
+    window.speechSynthesis.onvoiceschanged = () => { _pickedVoice = null; pickBestVoice(); };
+  }
+
+  function startSpeechKeepAlive(){
+    stopSpeechKeepAlive();
+    speechKeepAlive=setInterval(()=>{
+      if(window.speechSynthesis&&window.speechSynthesis.paused) window.speechSynthesis.resume();
+    },10000);
+  }
+  function stopSpeechKeepAlive(){ if(speechKeepAlive){clearInterval(speechKeepAlive);speechKeepAlive=null;} }
+
+  // Split text into natural phrases at sentence boundaries so the
+  // speech engine re-breathes between sentences — this alone makes it
+  // sound much more human. Each phrase is a separate utterance with
+  // a tiny gap so iOS doesn't merge them into a monotone wall.
+  function splitPhrases(text) {
+    return text
+      .split(/(?<=[.!?])\s+/)   // split after sentence-ending punctuation
+      .map(s => s.trim())
+      .filter(Boolean);
+  }
+
+  function speakPhrases(phrases, voice, idx=0) {
+    if (idx >= phrases.length) { stopSpeechKeepAlive(); return; }
+    const u = new SpeechSynthesisUtterance(phrases[idx]);
+    u.rate  = 0.82;   // unhurried teacher pace
+    u.pitch = 1.18;   // warm, bright — above neutral
+    u.volume = 1.0;
+    if (voice) u.voice = voice;
+    u.onstart = () => { if(idx===0) startSpeechKeepAlive(); };
+    u.onend   = () => { setTimeout(() => speakPhrases(phrases, voice, idx+1), 60); };
+    u.onerror = stopSpeechKeepAlive;
+    window.speechSynthesis.speak(u);
+  }
+
+  function speak(text) {
+    if (!voiceOn() || !window.speechSynthesis) return;
+    try {
+      window.speechSynthesis.cancel();
+      setTimeout(() => {
+        try {
+          // Retry voice pick — voices may not have loaded on first render
+          if (!_pickedVoice && _voicePickAttempts < 6) {
+            _voicePickAttempts++;
+            pickBestVoice();
+          }
+          const phrases = splitPhrases(text);
+          speakPhrases(phrases, _pickedVoice);
+        } catch {}
+      }, 80);
+    } catch {}
+  }
+
+  /* ── Weather ── */
+  async function getLatLon(zip) {
+    const c=loadJSON(K_GEO,null); if(c&&c.zip===zip&&c.latitude) return c;
+    const r=await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(zip)}&count=1&countryCode=US&language=en`,{cache:"no-store"});
+    if(!r.ok) throw new Error("geo");
+    const j=await r.json(),loc=j&&j.results&&j.results[0]; if(!loc) throw new Error("no loc");
+    const out={zip,latitude:loc.latitude,longitude:loc.longitude}; saveJSON(K_GEO,out); return out;
+  }
+  async function getTempF(zip) {
+    const c=loadJSON(K_WX,null),now=Date.now();
+    if(c&&c.zip===zip&&typeof c.tempF==="number"&&now-c.ts<20*60*1000) return c.tempF;
+    const {latitude,longitude}=await getLatLon(zip);
+    const r=await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m&temperature_unit=fahrenheit&timezone=auto`,{cache:"no-store"});
+    if(!r.ok) throw new Error("wx");
+    const j=await r.json(),tempF=j&&j.current&&j.current.temperature_2m;
+    if(typeof tempF!=="number") throw new Error("no temp");
+    saveJSON(K_WX,{zip,tempF,ts:now}); return tempF;
+  }
+  async function buildStepsForToday() {
+    let showJacket=true; try{showJacket=(await getTempF(ZIP_CODE))<JACKET_THRESHOLD_F;}catch{}
+    const steps=STEPS_BASE.filter(s=>!s.weatherControlled||showJacket);
+    const planned=steps.reduce((a,s)=>a+s.seconds,0);
+    return {steps,bufferSeconds:Math.min(Math.max(0,TOTAL_BUDGET_SECONDS-planned),BUFFER_DEFAULT_SECONDS)};
+  }
+
+  /* ── Helpers ── */
+  function fmtMMSS(t){ const s=Math.max(0,Math.ceil(t)); return `${String(Math.floor(s/60)).padStart(2,"0")}:${String(s%60).padStart(2,"0")}`; }
+
+  const SPARK_COLORS=["#ffb347","#ff6b6b","#56e39f","#fff","#ffd700"];
+  function sparkle(el,count=10) {
+    const sp=document.createElement("div"); sp.className="spark";
+    for(let i=0;i<count;i++){
+      const p=document.createElement("i");
+      p.style.setProperty("--r",Math.round((360/count)*i+(Math.random()*20-10))+"deg");
+      p.style.setProperty("--d",Math.round(30+Math.random()*30)+"px");
+      p.style.setProperty("--s",(0.8+Math.random()*.6).toFixed(2));
+      p.style.color=SPARK_COLORS[i%SPARK_COLORS.length];
+      sp.appendChild(p);
+    }
+    el.appendChild(sp); setTimeout(()=>{try{sp.remove();}catch{}},800);
+  }
+
+  function starsHTML() {
+    const s=[{x:8,y:15,d:0,e:"✨"},{x:86,y:14,d:180,e:"⭐"},{x:15,y:72,d:420,e:"✨"},{x:80,y:68,d:260,e:"⭐"},{x:48,y:8,d:80,e:"✨"},{x:56,y:88,d:340,e:"⭐"},{x:30,y:50,d:150,e:"🌟"},{x:70,y:42,d:300,e:"✨"}];
+    return `<div class="bgStars">${s.map(t=>`<span style="left:${t.x}%;top:${t.y}%;animation-delay:${t.d}ms">${t.e}</span>`).join("")}</div>`;
+  }
+
+  /* ── Reward helpers ── */
+  const BURST_COLORS = ["#ff6b6b","#ffb347","#ffe066","#56e39f","#4fc3f7","#a78bfa","#f472b6","#fff"];
+  const RAIN_EMOJIS  = ["⭐","🌟","✨","🎉","🎊","🏆","💫","🥳","❤️","🎈"];
+
+  function launchFireworks(container) {
+    const positions = [15,30,50,68,85];
+    positions.forEach((xPct, pi) => {
+      const delay = pi * 140;
+      const travel = 400 + Math.random() * 300;
+      // Rocket
+      const rocket = document.createElement("div");
+      rocket.className = "rocket";
+      rocket.style.cssText = `left:${xPct}%;background:${BURST_COLORS[pi%BURST_COLORS.length]};--delay:${delay}ms;--travel:-${travel}px;--dur:${600+Math.random()*200}ms;`;
+      container.appendChild(rocket);
+
+      // Burst of particles at explosion point
+      const burstY = 100 - (travel / window.innerHeight * 100) - 10;
+      setTimeout(() => {
+        const burst = document.createElement("div");
+        burst.className = "burst";
+        burst.style.cssText = `left:${xPct}%;bottom:${Math.max(10, Math.min(80, burstY))}%;`;
+        const count = 14;
+        for (let i = 0; i < count; i++) {
+          const sp = document.createElement("span");
+          const color = BURST_COLORS[Math.floor(Math.random()*BURST_COLORS.length)];
+          const dist  = 40 + Math.random() * 50;
+          sp.style.setProperty("--r",  Math.round((360/count)*i) + "deg");
+          sp.style.setProperty("--d",  dist + "px");
+          sp.style.setProperty("--c",  color);
+          sp.style.setProperty("--dur","0.7s");
+          burst.appendChild(sp);
+        }
+        container.appendChild(burst);
+        setTimeout(() => { try{burst.remove();}catch{} }, 900);
+      }, delay + 580);
+    });
+    // Clean rockets
+    setTimeout(() => { try{container.innerHTML="";}catch{} }, 3000);
+  }
+
+  function launchEmojiRain(container, count=16) {
+    for (let i = 0; i < count; i++) {
+      setTimeout(() => {
+        const el = document.createElement("div");
+        el.className = "rainDrop";
+        const emoji = RAIN_EMOJIS[Math.floor(Math.random()*RAIN_EMOJIS.length)];
+        const sz    = 20 + Math.random() * 20;
+        const dur   = 1.6 + Math.random() * 1.2;
+        const spin  = (Math.random() > .5 ? "" : "-") + Math.round(180 + Math.random()*360) + "deg";
+        el.style.cssText = `left:${Math.random()*100}%;--sz:${sz}px;--dur:${dur}s;--delay:0s;--spin:${spin};`;
+        el.textContent = emoji;
+        container.appendChild(el);
+        setTimeout(() => { try{el.remove();}catch{} }, (dur + .2) * 1000);
+      }, i * 120);
+    }
+  }
+
+  function jarBallsHTML(n){ return Array.from({length:Math.min(n,24)},()=>`<div class="jarBall"></div>`).join(""); }
+
+  /* ── Tick ── */
+  function stopTick(){ if(tickTimer) clearInterval(tickTimer); tickTimer=null; }
+
+  /* ── State ── */
+  function defaultState(steps,bufferSeconds){
+    return {running:false,steps:steps.map(s=>({...s})),idx:0,bufferLeft:bufferSeconds,stepStartMs:null,doneMap:{},lastUndo:null,speedBonus:false,spokenAlerts:{}};
+  }
+  function loadState(){ return loadJSON(K_STATE,null); }
+  function saveState(s){ saveJSON(K_STATE,s); }
+  function curStep(s){ return s.steps[s.idx]; }
+  function nextStep(s){ return s.steps[s.idx+1]||null; }
+  function elapsedSeconds(s){ return s.stepStartMs?(Date.now()-s.stepStartMs)/1000:0; }
+  function remainingSeconds(s){ const st=curStep(s); return st?Math.max(0,st.seconds-elapsedSeconds(s)):0; }
+  function progressPercent(s){ const st=curStep(s); if(!st||!st.seconds)return 0; return Math.min(elapsedSeconds(s),st.seconds)/st.seconds*100; }
+
+  function startTick(state){
+    stopTick();
+    tickTimer=setInterval(()=>{
+      const bar=mount.querySelector("[data-role='barFill']");
+      const time=mount.querySelector("[data-role='timeLeft']");
+      if(bar)  bar.style.width=Math.max(0,Math.min(100,progressPercent(state))).toFixed(2)+"%";
+      if(time) time.textContent=fmtMMSS(remainingSeconds(state));
+      if(state.running){
+        const step=curStep(state);
+        if(step){
+          const sl=remainingSeconds(state);
+          if(!state.spokenAlerts) state.spokenAlerts={};
+          TIME_ALERTS.forEach(a=>{
+            const k=`${step.id}-${a.secs}`;
+            if(!state.spokenAlerts[k]&&sl<=a.secs&&sl>a.secs-2){ state.spokenAlerts[k]=true; speak(a.phrase); }
+          });
+        }
+      }
+      if(state.running&&remainingSeconds(state)<=0){
+        state.running=false; saveState(state);
+        speak("Uh oh, time's up! Tap done when you're finished, or tap plus one minute if you need a little more time.");
+        render(state);
+      }
+    },250);
+  }
+
+  /* ── UI ── */
+  function showSettings(open){ const m=mount.querySelector("[data-role='modal']"); if(m) m.style.display=open?"grid":"none"; }
+
+  function showReward(state, wasSpeedBonus) {
+    const overlay = mount.querySelector("[data-role='reward']");
+    const ball    = mount.querySelector("[data-role='rewardBall']");
+    if (!overlay || !ball) return;
+
+    overlay.style.display = "grid";
+
+    // Drop the ball into the jar
+    ball.classList.remove("play"); void ball.offsetWidth; ball.classList.add("play");
+
+    // Fireworks
+    const fwLayer = overlay.querySelector(".fireworks");
+    if (fwLayer) {
+      launchFireworks(fwLayer);
+      if (wasSpeedBonus) setTimeout(() => launchFireworks(fwLayer), 900);
+    }
+
+    // Emoji rain
+    const rainLayer = overlay.querySelector(".emojiRain");
+    if (rainLayer) {
+      setTimeout(() => launchEmojiRain(rainLayer, wasSpeedBonus ? 24 : 16), 300);
+      if (wasSpeedBonus) setTimeout(() => launchEmojiRain(rainLayer, 16), 1600);
+    }
+
+    // Claps
+    setTimeout(() => {
+      ensureAudioReady();
+      playClapSequence();
+      if (wasSpeedBonus) setTimeout(playClapSequence, 550);
+    }, 1150);
+
+    setTimeout(() => {
+      overlay.style.display = "none";
+      ball.classList.remove("play");
+    }, wasSpeedBonus ? 5000 : 4000);
+  }
+
+  /* ── Actions ── */
+  function finish(state){
+    const timeLeft=remainingSeconds(state), wasSpeedBonus=timeLeft>5;
+    state.speedBonus=wasSpeedBonus; state.running=false; saveState(state);
+    const balls=addBall();
+    speak(wasSpeedBonus
+      ?`Wow, you finished ${Math.round(timeLeft)} seconds early — that's incredible! Go grab a ping pong ball. You now have ${balls} balls!`
+      :`You did it! Amazing job finishing your whole routine. Go get a ping pong ball — you earned it! You now have ${balls} balls!`);
+    render(state); showReward(state,wasSpeedBonus);
+  }
+
+  function advance(state){
+    const step=curStep(state), secsLeft=remainingSeconds(state);
+    if(step){
+      state.lastUndo={id:step.id,idx:state.idx,stepStartMs:state.stepStartMs,seconds:step.seconds};
+      state.doneMap[step.id]=true;
+    }
+    if(step&&secsLeft>5&&state.running){ const t=mount.querySelector(`.tile[data-id="${step.id}"]`); if(t) sparkle(t,14); playSpeedDing(); }
+    state.idx++; state.spokenAlerts={};
+    if(state.idx>=state.steps.length){ finish(state); return; }
+    state.stepStartMs=Date.now(); state.running=true; saveState(state);
+    const s=curStep(state); if(s) speak(s.speak);
+    render(state);
+  }
+
+  function undoLast(state){
+    if(!state.lastUndo) return;
+    const u=state.lastUndo;
+    delete state.doneMap[u.id];
+    state.steps[u.idx].seconds=u.seconds;
+    state.idx=u.idx; state.stepStartMs=u.stepStartMs; state.running=false; state.lastUndo=null;
+    saveState(state); speak("No worries, let's go back!"); render(state);
+  }
+
+  function startOrResume(state){
+    ensureAudioReady();
+    if(state.idx>=state.steps.length){ finish(state); return; }
+    state.running=true; if(!state.stepStartMs) state.stepStartMs=Date.now();
+    saveState(state); const s=curStep(state); if(s) speak(s.speak); render(state);
+  }
+
+  function addOneMinute(state){
+    ensureAudioReady();
+    if(state.bufferLeft<60){ speak("Sorry, there's no more extra time — let's finish up!"); return; }
+    const step=curStep(state); if(!step) return;
+    step.seconds+=60; state.bufferLeft-=60; state.running=true;
+    if(!state.stepStartMs) state.stepStartMs=Date.now();
+    saveState(state); speak("Sure thing! Here's one more minute — you've got this!"); render(state);
+  }
+
+  function skip(state){ ensureAudioReady(); advance(state); }
+  function toggle(k,def){ localStorage.setItem(k,(localStorage.getItem(k)||def)==="on"?"off":"on"); }
+
+  /* ── Render ── */
+  function render(state){
+    mount.dataset.labels=labelsOn()?"on":"off";
+    const s=curStep(state),n=nextStep(state);
+    const doneCount=Object.keys(state.doneMap).length,total=state.steps.length;
+    const pct=total?Math.round(doneCount/total*100):0;
+    const bufferMin=Math.floor(state.bufferLeft/60);
+    const balls=getBalls(),canUndo=!!state.lastUndo;
+
+    mount.innerHTML=`
+      <div class="wrap">
+        <div class="card" role="region" aria-label="Morning routine">
+          <div class="header">
+            <div class="hleft">
+              <div class="title">☀️ Morning Routine</div>
+              <div class="sub">${doneCount} of ${total} steps done · ${bufferMin} min buffer</div>
+            </div>
+            <div class="hright">
+              <div class="ballBadge">🏓 ${balls}</div>
+              <button class="greenBtn" id="btnDone">✅ Done</button>
+              <button class="icon" id="btnSettings" aria-label="Settings">⚙️</button>
+            </div>
+          </div>
+
+          <div class="body">
+            <div class="top">
+              <div class="now">
+                <div class="nowTop">
+                  <div class="bigIcon" aria-hidden="true">${s?s.icon:"🎉"}</div>
+                  <div class="nowMeta">
+                    <div class="stepName">${s?s.label:"All done!"}</div>
+                    <div class="timeLeft" data-role="timeLeft">${s?fmtMMSS(remainingSeconds(state)):"00:00"}</div>
+                    <div class="barWrap">
+                      <div class="barLabel">Time remaining</div>
+                      <div class="barTrack"><div class="barFill" data-role="barFill" style="width:${s?progressPercent(state).toFixed(2):100}%"></div></div>
+                    </div>
+                  </div>
+                </div>
+                <div class="ctaRow">
+                  <button class="primary" id="btnStart">${state.running?"⏸ Pause":(state.stepStartMs?"▶ Resume":"▶ Start")}</button>
+                  <button id="btnMore">⏱ +1 min</button>
+                  <button id="btnSkip">⏭ Skip</button>
+                  <button class="undo" id="btnUndo" ${canUndo?"":"disabled"}>↩ Undo</button>
+                </div>
+              </div>
+
+              <div class="side">
+                <div class="pill nextPill">
+                  <div class="pillIcon">${n?n.icon:"🏓"}</div>
+                  <div>
+                    <div class="pillText">${n?"Up next":"Reward!"}</div>
+                    <div class="pillSub">${n?n.label:"Finish and get a ball 🎉"}</div>
+                  </div>
+                </div>
+                <div class="pill">
+                  <div class="pillIcon">📊</div>
+                  <div><div class="pillText">Progress</div><div class="pillSub">${pct}% complete</div></div>
+                </div>
+                <div class="pill ballPill">
+                  <div class="pillIcon">🏓</div>
+                  <div><div class="pillText">Ball jar</div><div class="pillSub">${balls} ball${balls===1?"":"s"} earned</div></div>
+                </div>
+                <div class="pill">
+                  <div class="pillIcon">🌙</div>
+                  <div><div class="pillText">Daily reset</div><div class="pillSub">Resets at midnight</div></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="gridLabel">Steps</div>
+            <div class="grid" aria-label="Steps">
+              ${state.steps.map((st,i)=>{
+                const status=state.doneMap[st.id]?"done":(i===state.idx?"active":"todo");
+                return `<div class="tile" data-index="${i}" data-id="${st.id}" data-state="${status}" role="button" tabindex="0" aria-label="${st.label}">
+                  <div class="tileDone">✓</div>
+                  <div class="tileIcon" aria-hidden="true">${st.icon}</div>
+                  <div class="tileLabel">${st.label}</div>
+                </div>`;
+              }).join("")}
+            </div>
+          </div>
+        </div>
+
+        <div class="modal" data-role="modal">
+          <div class="modalCard">
+            <div class="modalTitle">⚙️ Settings</div>
+            <div class="row">
+              <button id="togLabels">Labels ${labelsOn()?"on ✓":"off"}</button>
+              <button id="togSound">Sound ${soundOn()?"on 🔊":"off 🔇"}</button>
+              <button id="togVoice">Voice ${voiceOn()?"on 🎙️":"off"}</button>
+            </div>
+            <div class="row">
+              <button id="btnReset">🔄 Reset today</button>
+              <button id="btnResetBalls">🏓 Reset jar</button>
+              <button class="primary" id="btnClose">Close</button>
+            </div>
+            <div class="modalTip">💡 Tip: On iPad, tap Start once each morning to enable sound and voice.</div>
+          </div>
+        </div>
+
+        <div class="reward" data-role="reward">
+          <div class="fireworks"></div>
+          <div class="emojiRain"></div>
+          <div class="rewardCard" data-role="rewardCard">
+            <div class="rewardEmoji">${state.speedBonus?"🚀":"🏆"}</div>
+            <div class="rewardTitle">${state.speedBonus?"Speed Bonus!":"You Did It!"}</div>
+            <div class="jarArea" aria-hidden="true">
+              <div class="ball" data-role="rewardBall"></div>
+              <div class="jar"><div class="jarFill">${jarBallsHTML(getBalls())}</div></div>
+            </div>
+            <div class="rewardSub">Go get a ping pong ball for your jar! 🎉</div>
+            <div class="rewardBalls">🏓 ${getBalls()} ball${getBalls()===1?"":"s"} total</div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    mount.querySelector("#btnStart").addEventListener("click",()=>{
+      if(state.running){
+        state.running=false;
+        const step=curStep(state),el=elapsedSeconds(state);
+        if(step&&el>0){step.seconds=Math.max(0,step.seconds-el);state.stepStartMs=null;}
+        saveState(state); render(state);
+      } else startOrResume(state);
+    });
+    mount.querySelector("#btnDone").addEventListener("click",()=>{ensureAudioReady();playTinyDing();advance(state);});
+    mount.querySelector("#btnMore").addEventListener("click",()=>addOneMinute(state));
+    mount.querySelector("#btnSkip").addEventListener("click",()=>{ensureAudioReady();skip(state);});
+    mount.querySelector("#btnUndo").addEventListener("click",()=>{if(canUndo){ensureAudioReady();undoLast(state);}});
+    mount.querySelector("#btnSettings").addEventListener("click",()=>showSettings(true));
+    mount.querySelector("#btnClose").addEventListener("click",()=>showSettings(false));
+    mount.querySelector("[data-role='modal']").addEventListener("click",e=>{if(e.target.getAttribute("data-role")==="modal")showSettings(false);});
+    mount.querySelector("#togLabels").addEventListener("click",()=>{toggle(K_LABELS,DEFAULT_LABELS);render(state);});
+    mount.querySelector("#togSound").addEventListener("click",()=>{toggle(K_SOUND,DEFAULT_SOUND);if(soundOn())ensureAudioReady();render(state);});
+    mount.querySelector("#togVoice").addEventListener("click",()=>{toggle(K_VOICE,DEFAULT_VOICE);render(state);});
+    mount.querySelector("#btnReset").addEventListener("click",async()=>{
+      ensureAudioReady(); const built=await buildStepsForToday();
+      const fresh=defaultState(built.steps,built.bufferSeconds); saveState(fresh);
+      speak("OK, let's start fresh! You've totally got this!"); render(fresh); showSettings(false);
+    });
+    mount.querySelector("#btnResetBalls").addEventListener("click",()=>{
+      if(confirm("Reset ball jar to zero?")){localStorage.setItem(K_BALLS,"0");render(state);showSettings(false);}
+    });
+    mount.querySelectorAll(".tile").forEach(tile=>{
+      tile.addEventListener("click",()=>{
+        ensureAudioReady();
+        const idx=Number(tile.dataset.index);
+        if(idx===state.idx&&!state.doneMap[tile.dataset.id]){sparkle(tile);playTinyDing();advance(state);}
+      });
+      tile.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();tile.click();}});
+    });
+
+    startTick(state);
+  }
+
+  /* ── Init ── */
+  (async function init(){
+    buildStarField();
+    resetForNewDayIfNeeded();
+    scheduleMidnightReset();
+    if(!localStorage.getItem(K_LABELS)) localStorage.setItem(K_LABELS,DEFAULT_LABELS);
+    if(!localStorage.getItem(K_SOUND))  localStorage.setItem(K_SOUND,DEFAULT_SOUND);
+    if(!localStorage.getItem(K_VOICE))  localStorage.setItem(K_VOICE,DEFAULT_VOICE);
+
+    const built=await buildStepsForToday();
+    let state=loadState();
+
+    if(!state||!Array.isArray(state.steps)||!state.steps.length){
+      state=defaultState(built.steps,built.bufferSeconds); saveState(state);
+    } else {
+      const doneMap=state.doneMap||{};
+      state.steps=built.steps.map(s=>({...s}));
+      state.bufferLeft=typeof state.bufferLeft==="number"?state.bufferLeft:built.bufferSeconds;
+      state.idx=Math.min(typeof state.idx==="number"?state.idx:0,state.steps.length);
+      state.doneMap=doneMap; state.lastUndo=state.lastUndo||null;
+      state.speedBonus=state.speedBonus||false; state.spokenAlerts=state.spokenAlerts||{};
+      while(state.idx<state.steps.length&&state.doneMap[state.steps[state.idx].id]) state.idx++;
+      if(state.idx>=state.steps.length){state.running=false;state.stepStartMs=null;}
+      saveState(state);
+    }
+    render(state);
+  })();
+})();
+</script>
+</body>
+</html>
