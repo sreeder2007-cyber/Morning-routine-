@@ -19,7 +19,7 @@
       <span class="eyebrow">behavior log</span>
     </div>
     <div class="topright">
-      <span class="sync" data-role="sync" title="Local only"></span>
+      <span class="sync" data-role="sync" title="This phone only"></span>
       <button class="chip" data-act="settings" aria-label="Settings">
         <span data-role="recorder">Me</span>
       </button>
@@ -60,7 +60,12 @@
         <button class="ghost" data-act="copy-csv">Copy CSV</button>
         <button class="ghost" data-act="save-csv">Download CSV</button>
       </div>
-      <p class="hint">CSV covers every entry ever recorded on this device, plus anything synced from your partner's.</p>
+      <div class="toolrow">
+        <button class="ghost" data-act="share-log">Share my log</button>
+        <button class="ghost" data-act="import-log">Merge a shared log</button>
+      </div>
+      <p class="hint">Share sends a link holding your last 30 days. Whoever opens it on the other
+      phone gets both logs in one place — no account, no app.</p>
     </section>
   </main>
 
@@ -154,7 +159,7 @@ button{font:inherit;color:inherit;cursor:pointer;border:none;background:none}
   min-height:100dvh;
   display:flex;
   flex-direction:column;
-  padding:0 14px calc(180px + env(safe-area-inset-bottom)) 14px;
+  padding:0 14px calc(196px + env(safe-area-inset-bottom)) 14px;
 }
 
 /* ── Top bar ── */
@@ -299,13 +304,16 @@ main{display:flex;flex-direction:column;gap:20px}
   border-top:1px solid var(--line);box-shadow:var(--shadow-dock);
   display:grid;gap:9px;
 }
-.dockmain{min-height:60px;display:grid}
-.instr{
-  display:flex;align-items:center;justify-content:center;gap:10px;
-  background:var(--ink);color:var(--bg);border-radius:15px;
-  padding:17px 14px;font-size:16px;font-weight:700;letter-spacing:.01em;
+.dockmain{display:grid}
+/* The three counts are the primary action; the latency timer is an
+   optional assist, so it sits above them as a quiet secondary control. */
+.timerlink{
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  border:1px dashed color-mix(in srgb,var(--nc) 45%,transparent);
+  color:var(--nc-ink);background:transparent;border-radius:12px;
+  padding:9px 12px;font-size:13px;font-weight:600;
 }
-.instr .sub{font-size:12px;font-weight:500;opacity:.7;letter-spacing:.02em}
+.timerlink .sub{font-weight:500;color:var(--muted)}
 .running{
   display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:11px;
   background:var(--nc-wash);border:1.5px solid var(--nc);border-radius:15px;padding:8px 10px;
@@ -328,23 +336,25 @@ main{display:flex;flex-direction:column;gap:20px}
 }
 .quick{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .q{
-  display:grid;gap:3px;justify-items:center;padding:11px 6px 10px;border-radius:14px;
-  border:1px solid var(--line);background:var(--surface-2);
+  display:grid;gap:4px;justify-items:center;align-content:center;
+  min-height:84px;padding:12px 6px;border-radius:16px;
+  border:1.5px solid color-mix(in srgb,var(--hue) 30%,var(--line));
+  background:color-mix(in srgb,var(--hue) 7%,var(--surface));
   transition:transform .09s ease, background .15s ease;
 }
 .q:active{transform:scale(.96)}
 .q .qn{
-  font-family:'Fraunces','Iowan Old Style',Georgia,serif;font-weight:700;font-size:23px;line-height:1;
+  font-family:'Fraunces','Iowan Old Style',Georgia,serif;font-weight:700;font-size:30px;line-height:1;
   color:var(--hue);font-variant-numeric:tabular-nums;
 }
-.q .ql{font-size:10px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);text-align:center;line-height:1.2}
+.q .ql{font-size:10.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);text-align:center;line-height:1.2}
 .q-nc{--hue:var(--nc-ink)} .q-wet{--hue:var(--wet-ink)} .q-tan{--hue:var(--tan-ink)}
-.q.pop{background:color-mix(in srgb,var(--hue) 16%,var(--surface-2))}
+.q.pop{background:color-mix(in srgb,var(--hue) 26%,var(--surface))}
 
 /* ── Toast ── */
 .toast{
   position:fixed;left:50%;transform:translateX(-50%);
-  bottom:calc(186px + env(safe-area-inset-bottom));z-index:9;
+  bottom:calc(200px + env(safe-area-inset-bottom));z-index:9;
   width:min(532px,calc(100% - 28px));
   display:flex;align-items:center;justify-content:space-between;gap:12px;
   background:var(--ink);color:var(--bg);border-radius:13px;padding:11px 13px;
@@ -431,10 +441,11 @@ main{display:flex;flex-direction:column;gap:20px}
      remote : the same two things from a partner's device, live      */
   const S = {
     dev:"", settings:Object.assign({}, DEFAULTS),
-    own:{}, edits:{}, dirty:[], everSynced:false,
-    remoteDays:{}, remoteEdits:{},
+    own:{}, edits:{},
+    shared:{}, sharedEdits:{},   // logs merged in from the other phone
     day:dayKey(Date.now()),
     timer:null,      // { startedAt }
+    pending:null,    // a shared log waiting to be merged
     episode:null,    // { id, startedAt, endedAt }
     lastLogged:null, // for undo
     _cache:null
@@ -447,7 +458,7 @@ main{display:flex;flex-direction:column;gap:20px}
       S.dev = raw.dev || "";
       Object.assign(S.settings, raw.settings || {});
       S.own = raw.own || {}; S.edits = raw.edits || {};
-      S.dirty = raw.dirty || []; S.everSynced = !!raw.everSynced;
+      S.shared = raw.shared || {}; S.sharedEdits = raw.sharedEdits || {};
       S.episode = raw.episode || null;
     }
     if (!S.dev) S.dev = "d" + Math.random().toString(36).slice(2, 8);
@@ -458,12 +469,11 @@ main{display:flex;flex-direction:column;gap:20px}
     try {
       localStorage.setItem(K.data, JSON.stringify({
         dev:S.dev, settings:S.settings, own:S.own, edits:S.edits,
-        dirty:S.dirty, everSynced:S.everSynced, episode:S.episode
+        shared:S.shared, sharedEdits:S.sharedEdits, episode:S.episode
       }));
     } catch (e) {}
   }
   function saveTimer(){ try { S.timer ? localStorage.setItem(K.timer, JSON.stringify(S.timer)) : localStorage.removeItem(K.timer); } catch (e) {} }
-  function markDirty(date){ if (date && S.dirty.indexOf(date) < 0) S.dirty.push(date); }
 
   /* ───────────────────── Derived: merged log ───────────────────── */
   function allEvents(){
@@ -471,13 +481,13 @@ main{display:flex;flex-direction:column;gap:20px}
     const base = new Map();
     const take = days => { for (const d in days) for (const ev of days[d]) if (ev && ev.id) base.set(ev.id, ev); };
     take(S.own);
-    for (const dev in S.remoteDays) take(S.remoteDays[dev]);
+    for (const dev in S.shared) take(S.shared[dev]);
 
     const edits = {};
     const merge = src => { for (const id in src) { const cur = edits[id];
       if (!cur || (src[id].rev || 0) > (cur.rev || 0)) edits[id] = src[id]; } };
     merge(S.edits);
-    for (const dev in S.remoteEdits) merge(S.remoteEdits[dev]);
+    for (const dev in S.sharedEdits) merge(S.sharedEdits[dev]);
 
     const out = [];
     base.forEach(ev => {
@@ -496,72 +506,63 @@ main{display:flex;flex-direction:column;gap:20px}
     return c;
   }
 
-  /* ───────────────────── Sync (shared link only) ───────────────────── */
-  const Sync = {
-    db:null, queue:new Set(), editsDirty:false, timer:null,
+  /* ───────────────────── Sharing between two phones ─────────────────────
+     No accounts and no server: a phone packs its own records into a link,
+     the other phone opens it and merges. Each phone only ever ships what
+     it recorded itself, so neither can overwrite the other's entries.   */
+  function b64e(str){
+    const bytes = new TextEncoder().encode(str);
+    let bin = ""; bytes.forEach(b => bin += String.fromCharCode(b));
+    return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
+  function b64d(str){
+    const bin = atob(str.replace(/-/g, "+").replace(/_/g, "/"));
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return new TextDecoder().decode(bytes);
+  }
 
-    async init(){
-      if (!window.claude || typeof claude.use !== "function") return;
-      let db = null;
-      try { db = await claude.use("db"); } catch (e) { db = null; }
-      if (!db) return;
-      Sync.db = db;
-      $("[data-role='sync']").setAttribute("data-state", "live");
-      $("[data-role='sync']").title = "Synced with your partner's device";
-
-      db.collection("days").orderBy("date", "desc").limit(140).onSnapshot(snap => {
-        const next = {};
-        for (const doc of snap.docs) {
-          const v = doc.data(); if (!v || v.dev === S.dev) continue;
-          (next[v.dev] = next[v.dev] || {})[v.date] = v.events || [];
-        }
-        S.remoteDays = next; S._cache = null; renderAll();
-      }, () => {});
-
-      db.collection("edits").limit(40).onSnapshot(snap => {
-        const next = {};
-        for (const doc of snap.docs) {
-          const v = doc.data(); if (!v || v.dev === S.dev) continue;
-          next[v.dev] = v.items || {};
-        }
-        S.remoteEdits = next; S._cache = null; renderAll();
-      }, () => {});
-
-      if (!S.everSynced) { for (const d in S.own) markDirty(d); S.everSynced = true; }
-      Sync.editsDirty = true;
-      for (const d of S.dirty) Sync.queue.add(d);
-      Sync.flushSoon();
-    },
-
-    push(date){ if (!Sync.db) return; if (date) Sync.queue.add(date); Sync.flushSoon(); },
-    pushEdits(){ Sync.editsDirty = true; Sync.push(null); },
-
-    flushSoon(){
-      if (!Sync.db) return;
-      clearTimeout(Sync.timer);
-      Sync.timer = setTimeout(Sync.flush, 500);
-    },
-
-    async flush(){
-      if (!Sync.db) return;
-      const dates = Array.from(Sync.queue); Sync.queue.clear();
-      for (const date of dates) {
-        try {
-          await Sync.db.doc("days/" + date + "__" + S.dev).set({
-            date:date, dev:S.dev, by:S.settings.recorder,
-            events:S.own[date] || [], updatedAt:Date.now()
-          });
-          S.dirty = S.dirty.filter(d => d !== date); save();
-        } catch (e) { Sync.queue.add(date); }
-      }
-      if (Sync.editsDirty) {
-        try {
-          await Sync.db.doc("edits/" + S.dev).set({ dev:S.dev, items:S.edits, updatedAt:Date.now() });
-          Sync.editsDirty = false;
-        } catch (e) {}
-      }
+  const SHARE_DAYS = 30;
+  function sharePayload(){
+    const cutoff = shiftKey(dayKey(Date.now()), -(SHARE_DAYS - 1));
+    const days = {};
+    for (const d in S.own) if (d >= cutoff && S.own[d].length) {
+      days[d] = S.own[d].map(e => [e.type, e.ts, e.by || "", e.note || "", e.endedAt || 0, e.resolution || ""]);
     }
-  };
+    return { v:1, dev:S.dev, by:S.settings.recorder, days:days, edits:S.edits };
+  }
+  function shareUrl(){
+    const base = location.href.split("#")[0];
+    return base + "#log=" + b64e(JSON.stringify(sharePayload()));
+  }
+  function countPayload(pl){
+    let n = 0; for (const d in pl.days) n += pl.days[d].length; return n;
+  }
+  function mergePayload(pl){
+    const dev = pl.dev;
+    if (!dev || dev === S.dev) return 0;
+    const mine = S.shared[dev] = S.shared[dev] || {};
+    let n = 0;
+    for (const d in pl.days) {
+      mine[d] = pl.days[d].map(r => ({
+        id:dev + "-" + Number(r[1]).toString(36) + "-" + r[0], type:r[0], ts:r[1], by:r[2] || pl.by || "",
+        dev:dev, note:r[3] || "", endedAt:r[4] || undefined, resolution:r[5] || ""
+      }));
+      n += mine[d].length;
+    }
+    S.sharedEdits[dev] = pl.edits || {};
+    S._cache = null; save();
+    return n;
+  }
+  function readHashPayload(){
+    const m = /[#&]log=([A-Za-z0-9\-_]+)/.exec(location.hash || "");
+    if (!m) return null;
+    try { return JSON.parse(b64d(m[1])); } catch (e) { return null; }
+  }
+  function clearHash(){
+    try { history.replaceState(null, "", location.href.split("#")[0]); }
+    catch (e) { location.hash = ""; }
+  }
 
   /* ───────────────────── Recording ───────────────────── */
   function addEvent(type, ts, extra){
@@ -570,7 +571,7 @@ main{display:flex;flex-direction:column;gap:20px}
     }, extra || {});
     const key = dayKey(ev.ts);
     (S.own[key] = S.own[key] || []).push(ev);
-    markDirty(key); save(); Sync.push(key);
+    save();
     return ev;
   }
   function patchEvent(id, patch){
@@ -587,13 +588,12 @@ main{display:flex;flex-direction:column;gap:20px}
         list.splice(i, 1);
         const nk = dayKey(merged.ts);
         (S.own[nk] = S.own[nk] || []).push(merged);
-        markDirty(nk); Sync.push(nk);
       } else { list[i] = merged; }
-      markDirty(oldKey); save(); Sync.push(oldKey);
+      save();
     } else {
-      // Partner's record: never rewrite their document, publish an edit.
+      // The other phone's record: keep theirs intact, record our change beside it.
       S.edits[id] = Object.assign({}, S.edits[id], patch, { rev:Date.now() });
-      save(); Sync.pushEdits();
+      save();
     }
     S._cache = null;
   }
@@ -691,6 +691,10 @@ main{display:flex;flex-direction:column;gap:20px}
     lab.textContent = S.day === today ? "Today · " + longDate(S.day)
       : S.day === shiftKey(today, -1) ? "Yesterday · " + longDate(S.day) : longDate(S.day);
     lab.setAttribute("data-today", S.day === today ? "yes" : "no");
+
+    const dot = $("[data-role='sync']");
+    dot.setAttribute("data-state", Object.keys(S.shared).length ? "live" : "solo");
+    dot.title = Object.keys(S.shared).length ? "Includes a log shared from another phone" : "This phone only";
     $("[data-act='next-day']").disabled = S.day >= today;
 
     renderTiles(); renderEpisode(); renderTimeline(); renderWeek(); renderDock();
@@ -809,8 +813,8 @@ main{display:flex;flex-direction:column;gap:20px}
       paintRing(left);
     } else {
       el.innerHTML = `
-        <button class="instr" data-act="instruction">
-          Instruction given<span class="sub">${st.latency}s window</span>
+        <button class="timerlink" data-act="instruction">
+          Time an instruction<span class="sub">${st.latency}s window, hands-free</span>
         </button>`;
     }
   }
@@ -896,11 +900,52 @@ main{display:flex;flex-direction:column;gap:20px}
           <input id="s-alert" type="checkbox" ${st.alert ? "checked" : ""}></label>
       </div>
       <p class="hint"><strong>Non-compliance</strong> — ${esc(B.nc.def.replace("{latency}", st.latency).replace("{engagement}", st.engagement))}</p>
-      <p class="hint">This device is <code>${esc(S.dev)}</code>${Sync.db ? ", syncing live." : ", storing data on this device only."}</p>
+      <p class="hint">Entries live on this phone. Use <strong>Share my log</strong> to send them
+      to the other phone${Object.keys(S.shared).length ? ", which has already shared one back" : ""}.</p>
       <div class="sheetacts">
         <button class="secondary" data-act="close-sheet">Cancel</button>
         <button class="primary" data-act="save-settings">Save</button>
       </div>`);
+  }
+
+  function importSheet(){
+    openSheet(`
+      <h3>Merge a shared log</h3>
+      <p class="hint">Paste the link the other phone sent you. Only their own entries come
+      across, so nothing you recorded here is touched.</p>
+      <div class="field">
+        <label for="f-link">Shared link</label>
+        <textarea id="f-link" placeholder="Paste here"></textarea>
+      </div>
+      <div class="sheetacts">
+        <button class="secondary" data-act="close-sheet">Cancel</button>
+        <button class="primary" data-act="do-import">Merge</button>
+      </div>`);
+  }
+
+  function offerMerge(pl){
+    const n = countPayload(pl);
+    const dates = Object.keys(pl.days || {}).sort();
+    openSheet(`
+      <h3>${esc(pl.by || "Another phone")}'s log</h3>
+      <p class="hint">${n} ${n === 1 ? "entry" : "entries"}${dates.length ? ", " + shortDate(dates[0]) + " – " + shortDate(dates[dates.length-1]) : ""}.
+      Merging keeps both logs in one place on this phone.</p>
+      <div class="sheetacts">
+        <button class="secondary" data-act="skip-merge">Not now</button>
+        <button class="primary" data-act="do-merge">Merge ${n}</button>
+      </div>`);
+    S.pending = pl;
+  }
+
+  async function shareLog(){
+    const url = shareUrl();
+    const n = countPayload(sharePayload());
+    const text = S.settings.recorder + "'s log for " + S.settings.child + " — " + n + " entries";
+    if (navigator.share) {
+      try { await navigator.share({ title:S.settings.child + " — behavior log", text:text, url:url }); return; }
+      catch (e) { if (e && e.name === "AbortError") return; }
+    }
+    copyOut("Link", url);
   }
 
   function textSheet(title, body){
@@ -1037,6 +1082,24 @@ main{display:flex;flex-direction:column;gap:20px}
       save(); closeSheet(); renderAll();
     }
     else if (act === "close-sheet") { closeSheet(); }
+    else if (act === "share-log")   { shareLog(); }
+    else if (act === "import-log")  { importSheet(); }
+    else if (act === "do-import")   {
+      const raw = $("#f-link").value.trim();
+      const m = /[#&]log=([A-Za-z0-9\-_]+)/.exec(raw) || /^([A-Za-z0-9\-_]{20,})$/.exec(raw);
+      let pl = null;
+      try { pl = m ? JSON.parse(b64d(m[1])) : null; } catch (e) { pl = null; }
+      if (!pl || !pl.days) { toast("That link didn't contain a log", null); return; }
+      const n = mergePayload(pl);
+      closeSheet(); renderAll();
+      toast(n ? (pl.by || "Their") + " log merged — " + n + " entries" : "Nothing new to merge", null);
+    }
+    else if (act === "do-merge")    {
+      const n = mergePayload(S.pending || {});
+      S.pending = null; clearHash(); closeSheet(); renderAll();
+      toast(n ? n + " entries merged" : "Nothing new to merge", null);
+    }
+    else if (act === "skip-merge")  { S.pending = null; clearHash(); closeSheet(); }
     else if (act === "copy-summary"){ copyOut("Weekly summary", summary()); }
     else if (act === "copy-csv")    { copyOut("CSV", csv()); }
     else if (act === "save-csv")    { saveCsv(); }
@@ -1056,7 +1119,10 @@ main{display:flex;flex-direction:column;gap:20px}
 
   renderAll();
   if (S.timer || S.episode) tick();
-  Sync.init();
+
+  const incoming = readHashPayload();
+  if (incoming && incoming.dev !== S.dev) offerMerge(incoming);
+  else if (incoming) clearHash();
 
   let seenDay = dayKey(Date.now());
   setInterval(() => {

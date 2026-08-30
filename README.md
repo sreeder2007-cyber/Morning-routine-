@@ -1,7 +1,7 @@
 # Morning-routine-
 
-Two single-file pages, no build step, no accounts. Open either one, add it to your
-phone's home screen, and it works offline.
+Two single-file pages, no build step, no accounts, no app to install. Open either one,
+add it to your phone's home screen, and it works offline.
 
 | File | Who it's for | What it does |
 | --- | --- | --- |
@@ -10,22 +10,28 @@ phone's home screen, and it works offline.
 
 ## tracker.html
 
-Three counts, one tap each, plus the piece that's easy to get wrong by hand — the
-10-second latency window for non-compliance.
+Three counts, one tap each. Tap **Non-compliance**, **Accident**, or **Tantrum** and it's
+recorded with the time — nothing else to confirm, and a six-second Undo if you miss.
 
-- **Instruction given** starts a 10-second countdown. Tap **Paul started** and
-  nothing is recorded. Let it run out and non-compliance is logged automatically,
-  timestamped at the 10-second mark, with a buzz so you don't have to watch the screen.
-- The **episode** stays open until you mark that he began the task or asked for help
-  or a break, which records how long it lasted. A 30-second engagement clock then
-  shows when a new occurrence may be counted.
-- Every entry can be retimed, annotated, or deleted; entries can be added after the fact.
-- **Copy weekly summary** and **Copy CSV** produce something you can paste straight
-  into an email to the BCBA.
+Optional, above the three buttons: **Time an instruction** starts a 10-second countdown for
+the latency window in the non-compliance definition. Tap **Paul started** and nothing is
+recorded; let it run out and non-compliance is logged automatically, timestamped at the
+10-second mark, with a buzz so you don't have to watch the screen. The episode then stays
+open until you mark that he began the task or asked for help or a break, which records how
+long it lasted, followed by a 30-second engagement clock showing when a new occurrence may
+be counted. Ignore all of this and the one-tap button still works.
+
+Also here: day-by-day history, a 7-day chart per behavior, entries that can be retimed,
+annotated, or deleted, "+ Add earlier" for backdating, and **Copy weekly summary** /
+**Copy CSV** for pasting into an email to the BCBA.
 
 Latency (10s), engagement (30s), the child's name, and who's logging are all in Settings.
 
-Data lives in the browser's local storage on each device. When the same page is opened
-as a shared Claude Artifact, both phones read and write one live log: each device only
-ever writes its own records, and edits are published separately and merged, so
-simultaneous taps can't overwrite each other.
+### Two phones, no accounts
+
+Entries live in each phone's own browser storage. **Share my log** packs that phone's last
+30 days into a link — a few hundred characters for a typical day — that you text to the
+other phone. Opening it offers to merge; **Merge a shared log** does the same from a pasted
+link. A phone only ever ships the entries it recorded itself, and merged entries keep stable
+identities, so re-sharing updates the log instead of duplicating it and neither phone can
+overwrite the other's records.
