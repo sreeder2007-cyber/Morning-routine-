@@ -27,6 +27,17 @@ annotated, or deleted, "+ Add earlier" for backdating, and **Copy weekly summary
 
 Latency (10s), engagement (30s), the child's name, and who's logging are all in Settings.
 
+### On the home screen
+
+`manifest.json` and `icon-192/512.png` make it install as a standalone app.
+**iPhone:** open the page in Safari (it has to be Safari) → Share → Add to Home Screen.
+**Android:** open it in Chrome → menu → Install app.
+
+On iOS the installed app keeps its own storage, separate from Safari's — so install it
+first and then log only from the home-screen icon, or the two copies drift apart. When a
+shared link arrives by text, copy it and paste it into **Merge a shared log** inside the
+app rather than opening it in the browser.
+
 ### Two phones, no accounts
 
 Entries live in each phone's own browser storage. **Share my log** packs that phone's last
