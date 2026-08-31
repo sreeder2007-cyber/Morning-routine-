@@ -38,6 +38,20 @@ first and then log only from the home-screen icon, or the two copies drift apart
 shared link arrives by text, copy it and paste it into **Merge a shared log** inside the
 app rather than opening it in the browser.
 
+### One-tap buttons
+
+`tracker.html#add=nc`, `#add=toilet`, and `#add=tantrum` record one entry the moment the
+page opens and show a full-screen confirmation with an Undo. The hash is cleared before
+anything is written, so a refresh can't log twice, and the same handler runs on
+`hashchange` so it works whether the app was closed or already open.
+
+`manifest.json` maps those three URLs to app shortcuts — on Android, long-press the icon
+to get all three, and drag any one of them onto the home screen as its own button. iOS has
+no equivalent, so the way to get buttons there is the Shortcuts app: one "Open URLs"
+shortcut per behavior, surfaced through the Shortcuts widget, Back Tap, or the Action
+Button. Those open the default browser, so on iPhone pick one home for the data — the
+installed app, or Safari with widgets, not both.
+
 ### Two phones, no accounts
 
 Entries live in each phone's own browser storage. **Share my log** packs that phone's last

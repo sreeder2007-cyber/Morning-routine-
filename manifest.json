@@ -1,7 +1,7 @@
 {
   "name": "Behavior Log",
   "short_name": "Behavior Log",
-  "description": "Non-compliance, toileting accidents, and tantrums — one tap each.",
+  "description": "Non-compliance, toileting accidents, and tantrums \u2014 one tap each.",
   "start_url": "tracker.html",
   "scope": "./",
   "display": "standalone",
@@ -9,8 +9,59 @@
   "background_color": "#e7ebed",
   "theme_color": "#e7ebed",
   "icons": [
-    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" },
-    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Log non-compliance",
+      "short_name": "Non-compliance",
+      "url": "tracker.html#add=nc",
+      "icons": [
+        {
+          "src": "shortcut-nc.png",
+          "sizes": "96x96",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Log toileting accident",
+      "short_name": "Accident",
+      "url": "tracker.html#add=toilet",
+      "icons": [
+        {
+          "src": "shortcut-toilet.png",
+          "sizes": "96x96",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Log tantrum",
+      "short_name": "Tantrum",
+      "url": "tracker.html#add=tantrum",
+      "icons": [
+        {
+          "src": "shortcut-tantrum.png",
+          "sizes": "96x96",
+          "type": "image/png"
+        }
+      ]
+    }
   ]
 }

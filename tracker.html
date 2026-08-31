@@ -92,6 +92,8 @@
     </div>
   </div>
 
+  <div class="flash" data-role="flash" hidden></div>
+
   <div class="toast" data-role="toast" hidden>
     <span data-role="toast-text"></span>
     <button data-act="undo">Undo</button>
@@ -369,6 +371,34 @@ main{display:flex;flex-direction:column;gap:20px}
   font-weight:700;font-size:13px;letter-spacing:.06em;text-transform:uppercase;
   color:var(--bg);border-bottom:1.5px solid currentColor;padding-bottom:1px;
 }
+
+/* ── Launch confirmation ──
+   Opened from a Home Screen button, the phone is often locked again a
+   second later, so the confirmation has to read at arm's length.       */
+.flash{
+  position:fixed;inset:0;z-index:11;background:var(--wash);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
+  padding:24px;text-align:center;
+}
+.flash .fmark{
+  width:78px;height:78px;border-radius:50%;background:var(--hue);
+  display:flex;align-items:center;justify-content:center;margin-bottom:10px;
+}
+.flash .fmark svg{width:40px;height:40px;stroke:var(--surface);stroke-width:3.5;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.flash .fname{
+  font-family:'Fraunces','Iowan Old Style',Georgia,serif;font-weight:700;
+  font-size:30px;line-height:1.1;color:var(--hue);
+}
+.flash .fsub{font-size:15px;color:var(--muted);font-variant-numeric:tabular-nums}
+.flash .facts{display:flex;gap:10px;margin-top:22px}
+.flash .facts button{
+  border-radius:13px;padding:14px 26px;font-size:15px;font-weight:600;
+  border:1px solid var(--line);background:var(--surface);
+}
+.flash .facts .keep{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.f-nc{--hue:var(--nc-ink);--wash:var(--nc-wash)}
+.f-toilet{--hue:var(--wet-ink);--wash:var(--wet-wash)}
+.f-tantrum{--hue:var(--tan-ink);--wash:var(--tan-wash)}
 
 /* ── Sheet ── */
 .scrim{
@@ -831,6 +861,31 @@ main{display:flex;flex-direction:column;gap:20px}
     setTimeout(() => b.classList.remove("pop"), 260);
   }
 
+  function ordinal(n){
+    const t = n % 100;
+    if (t >= 11 && t <= 13) return n + "th";
+    return n + (["th","st","nd","rd"][n % 10] || "th");
+  }
+
+  let flashTimer = null;
+  function flashLogged(ev){
+    const nth = eventsOn(dayKey(ev.ts)).filter(e => e.type === ev.type).length;
+    const el = $("[data-role='flash']");
+    el.className = "flash f-" + ev.type;
+    el.innerHTML = `
+      <span class="fmark"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12.5l5.5 5.5L20 7"></path></svg></span>
+      <span class="fname">${esc(B[ev.type].short)} logged</span>
+      <span class="fsub">${ordinal(nth)} today &middot; ${clockOf(ev.ts)}</span>
+      <span class="facts">
+        <button data-act="undo-flash">Undo</button>
+        <button class="keep" data-act="dismiss-flash">Done</button>
+      </span>`;
+    el.hidden = false;
+    clearTimeout(flashTimer);
+    flashTimer = setTimeout(dismissFlash, 6000);
+  }
+  function dismissFlash(){ clearTimeout(flashTimer); $("[data-role='flash']").hidden = true; }
+
   let toastTimer = null;
   function toast(text, action){
     const el = $("[data-role='toast']");
@@ -1087,6 +1142,8 @@ main{display:flex;flex-direction:column;gap:20px}
       save(); closeSheet(); renderAll();
     }
     else if (act === "close-sheet") { closeSheet(); }
+    else if (act === "dismiss-flash"){ dismissFlash(); }
+    else if (act === "undo-flash")  { undoLast(); dismissFlash(); }
     else if (act === "share-log")   { shareLog(); }
     else if (act === "import-log")  { importSheet(); }
     else if (act === "do-import")   {
@@ -1125,9 +1182,27 @@ main{display:flex;flex-direction:column;gap:20px}
   renderAll();
   if (S.timer || S.episode) tick();
 
-  const incoming = readHashPayload();
-  if (incoming && incoming.dev !== S.dev) offerMerge(incoming);
-  else if (incoming) clearHash();
+  // A Home Screen button or Shortcut opens tracker.html#add=<behavior>, and a
+  // shared log arrives as #log=<data>. Either can land on a cold start OR on a
+  // page that is already open, where the browser only swaps the hash — so the
+  // same handler runs at startup and on every hashchange. The hash is cleared
+  // before anything is recorded, so a refresh can never log twice.
+  function handleHash(){
+    const quick = /[#&]add=(nc|toilet|tantrum)/.exec(location.hash || "");
+    if (quick) {
+      clearHash();
+      const ev = addEvent(quick[1]);
+      S.lastLogged = ev.id;
+      S.day = dayKey(ev.ts);
+      renderAll(); flashLogged(ev);
+      return;
+    }
+    const incoming = readHashPayload();
+    if (!incoming) return;
+    if (incoming.dev !== S.dev) offerMerge(incoming); else clearHash();
+  }
+  handleHash();
+  window.addEventListener("hashchange", handleHash);
 
   let seenDay = dayKey(Date.now());
   setInterval(() => {
