@@ -1,0 +1,1147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Behavior Log">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#e7ebed">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="icon-192.png">
+<meta name="color-scheme" content="light dark">
+<title>Paul's Behavior Log</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,500;9..144,700&display=swap">
+</head>
+<body>
+
+<div id="app" class="wrap">
+  <header class="topbar">
+    <div class="ident">
+      <h1 class="wordmark" data-role="child">Paul</h1>
+      <span class="eyebrow">behavior log</span>
+    </div>
+    <div class="topright">
+      <span class="sync" data-role="sync" title="This phone only"></span>
+      <button class="chip" data-act="settings" aria-label="Settings">
+        <span data-role="recorder">Me</span>
+      </button>
+    </div>
+  </header>
+
+  <nav class="daynav">
+    <button class="navbtn" data-act="prev-day" aria-label="Previous day">&#8249;</button>
+    <button class="daylabel" data-act="today" data-role="daylabel">Today</button>
+    <button class="navbtn" data-act="next-day" aria-label="Next day">&#8250;</button>
+  </nav>
+
+  <main>
+    <section class="tiles" data-role="tiles"></section>
+
+    <section class="panel episode" data-role="episode" hidden></section>
+
+    <section class="block">
+      <div class="blockhead">
+        <h2>Entries</h2>
+        <button class="ghost" data-act="add-entry">+ Add earlier</button>
+      </div>
+      <ol class="timeline" data-role="timeline"></ol>
+    </section>
+
+    <section class="block">
+      <div class="blockhead">
+        <h2>Last 7 days</h2>
+        <span class="hint" data-role="weekrange"></span>
+      </div>
+      <div class="week" data-role="week"></div>
+    </section>
+
+    <section class="block tools">
+      <div class="blockhead"><h2>Send the data</h2></div>
+      <div class="toolrow">
+        <button class="ghost" data-act="copy-summary">Copy weekly summary</button>
+        <button class="ghost" data-act="copy-csv">Copy CSV</button>
+        <button class="ghost" data-act="save-csv">Download CSV</button>
+      </div>
+      <div class="toolrow">
+        <button class="ghost" data-act="share-log">Share my log</button>
+        <button class="ghost" data-act="import-log">Merge a shared log</button>
+      </div>
+      <p class="hint">Share sends a link holding your last 30 days. Whoever opens it on the other
+      phone gets both logs in one place — no account, no app.</p>
+    </section>
+  </main>
+
+  <div class="dock">
+    <div class="dockmain" data-role="dockmain"></div>
+    <div class="quick">
+      <button class="q q-nc" data-act="log" data-type="nc">
+        <span class="qn" data-count="nc">0</span>
+        <span class="ql">Non-compliance</span>
+      </button>
+      <button class="q q-wet" data-act="log" data-type="toilet">
+        <span class="qn" data-count="toilet">0</span>
+        <span class="ql">Accident</span>
+      </button>
+      <button class="q q-tan" data-act="log" data-type="tantrum">
+        <span class="qn" data-count="tantrum">0</span>
+        <span class="ql">Tantrum</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="toast" data-role="toast" hidden>
+    <span data-role="toast-text"></span>
+    <button data-act="undo">Undo</button>
+  </div>
+
+  <div class="scrim" data-role="scrim" hidden>
+    <div class="sheet" role="dialog" aria-modal="true" data-role="sheet"></div>
+  </div>
+</div>
+
+<style>
+/* ── Tokens ─────────────────────────────────────────────
+   Cool, teal-biased neutrals so the three behavior hues do
+   all the talking. Light palette is complete on :root.     */
+:root{
+  --bg:#e7ebed;      --surface:#fff;        --surface-2:#f3f6f7;
+  --line:#d2dade;    --line-soft:#e2e8eb;
+  --ink:#141a1e;     --muted:#57666f;       --faint:#8797a0;
+  --nc:#a8480c;      --nc-ink:#a8480c;      --nc-wash:#fbeadd;
+  --wet:#0b6377;     --wet-ink:#0b6377;     --wet-wash:#e0f0f4;
+  --tan:#8f1a4c;     --tan-ink:#8f1a4c;     --tan-wash:#fae4ec;
+  --good:#1d6d47;
+  --shadow:0 1px 2px rgba(20,30,36,.07), 0 8px 24px rgba(20,30,36,.08);
+  --shadow-dock:0 -8px 28px rgba(20,30,36,.10);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0f1418;    --surface:#171d23;     --surface-2:#1e262d;
+    --line:#2a333b;  --line-soft:#222b32;
+    --ink:#e9eef1;   --muted:#98a7b1;       --faint:#6d7b85;
+    --nc:#f0a165;    --nc-ink:#f6b483;      --nc-wash:#33200f;
+    --wet:#5cc0d6;   --wet-ink:#7fd0e2;     --wet-wash:#0c2830;
+    --tan:#e888ac;   --tan-ink:#f0a0be;     --tan-wash:#331020;
+    --good:#5cc38c;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 10px 30px rgba(0,0,0,.35);
+    --shadow-dock:0 -8px 30px rgba(0,0,0,.45);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0f1418;      --surface:#171d23;     --surface-2:#1e262d;
+  --line:#2a333b;    --line-soft:#222b32;
+  --ink:#e9eef1;     --muted:#98a7b1;       --faint:#6d7b85;
+  --nc:#f0a165;      --nc-ink:#f6b483;      --nc-wash:#33200f;
+  --wet:#5cc0d6;     --wet-ink:#7fd0e2;     --wet-wash:#0c2830;
+  --tan:#e888ac;     --tan-ink:#f0a0be;     --tan-wash:#331020;
+  --good:#5cc38c;
+  --shadow:0 1px 2px rgba(0,0,0,.4), 0 10px 30px rgba(0,0,0,.35);
+  --shadow-dock:0 -8px 30px rgba(0,0,0,.45);
+}
+
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg);
+  color:var(--ink);
+  font-family:'Archivo','Helvetica Neue',Arial,sans-serif;
+  font-size:15px;
+  line-height:1.45;
+  -webkit-text-size-adjust:100%;
+  -webkit-tap-highlight-color:transparent;
+}
+button{font:inherit;color:inherit;cursor:pointer;border:none;background:none}
+[hidden]{display:none !important}
+:focus-visible{outline:2.5px solid var(--wet);outline-offset:2px;border-radius:8px}
+
+.wrap{
+  width:min(560px,100%);
+  margin:0 auto;
+  min-height:100vh;
+  min-height:100dvh;
+  display:flex;
+  flex-direction:column;
+  padding:0 14px calc(196px + env(safe-area-inset-bottom)) 14px;
+}
+
+/* ── Top bar ── */
+.topbar{
+  position:sticky;top:0;z-index:6;
+  display:flex;align-items:flex-end;justify-content:space-between;gap:12px;
+  padding:calc(12px + env(safe-area-inset-top)) 0 10px;
+  background:linear-gradient(var(--bg) 70%, transparent);
+}
+.ident{display:flex;align-items:baseline;gap:8px;min-width:0}
+.wordmark{
+  font-family:'Fraunces','Iowan Old Style',Georgia,serif;
+  font-optical-sizing:auto;
+  font-weight:700;font-size:27px;line-height:1;margin:0;
+  letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.eyebrow{
+  font-size:10.5px;font-weight:600;letter-spacing:.13em;text-transform:uppercase;
+  color:var(--faint);white-space:nowrap;
+}
+.topright{display:flex;align-items:center;gap:8px;flex:none}
+.sync{
+  width:9px;height:9px;border-radius:50%;
+  background:var(--faint);box-shadow:0 0 0 3px color-mix(in srgb,var(--faint) 20%,transparent);
+}
+.sync[data-state="live"]{background:var(--good);box-shadow:0 0 0 3px color-mix(in srgb,var(--good) 22%,transparent)}
+.chip{
+  border:1px solid var(--line);background:var(--surface);
+  border-radius:999px;padding:6px 13px;font-size:13px;font-weight:600;
+}
+
+/* ── Day nav ── */
+.daynav{
+  display:grid;grid-template-columns:44px 1fr 44px;align-items:center;gap:6px;
+  margin-bottom:12px;
+}
+.navbtn{
+  height:40px;border-radius:12px;border:1px solid var(--line);background:var(--surface);
+  font-size:20px;line-height:1;color:var(--muted);
+}
+.navbtn:disabled{opacity:.35;cursor:default}
+.daylabel{
+  height:40px;border-radius:12px;border:1px solid var(--line);background:var(--surface);
+  font-weight:600;font-size:14px;letter-spacing:.01em;
+}
+.daylabel[data-today="yes"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+
+main{display:flex;flex-direction:column;gap:20px}
+
+/* ── Summary tiles ── */
+.tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.tile{
+  background:var(--surface);border-radius:16px;padding:12px 11px 11px;
+  border:1px solid var(--line-soft);box-shadow:var(--shadow);
+  display:grid;gap:2px;position:relative;overflow:hidden;
+}
+.tile::before{content:"";position:absolute;inset:0 auto 0 0;width:4px;background:var(--hue)}
+.tile .n{
+  font-family:'Fraunces','Iowan Old Style',Georgia,serif;
+  font-weight:700;font-size:38px;line-height:.95;color:var(--hue);
+  font-variant-numeric:tabular-nums;
+}
+.tile .l{font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);line-height:1.25}
+.tile .avg{font-size:11px;color:var(--faint);font-variant-numeric:tabular-nums}
+.t-nc{--hue:var(--nc-ink)} .t-toilet{--hue:var(--wet-ink)} .t-tantrum{--hue:var(--tan-ink)}
+
+/* ── Blocks ── */
+.block{display:flex;flex-direction:column;gap:9px}
+.blockhead{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.blockhead h2{
+  margin:0;font-size:11.5px;font-weight:600;letter-spacing:.13em;text-transform:uppercase;color:var(--faint);
+}
+.hint{font-size:12px;color:var(--faint);margin:0}
+.ghost{
+  border:1px solid var(--line);background:var(--surface);border-radius:11px;
+  padding:7px 12px;font-size:13px;font-weight:600;color:var(--muted);
+}
+.toolrow{display:flex;flex-wrap:wrap;gap:8px}
+
+/* ── Timeline ── */
+.timeline{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.entry{
+  display:grid;grid-template-columns:62px 1fr auto;align-items:center;gap:10px;
+  background:var(--surface);border:1px solid var(--line-soft);border-radius:13px;
+  padding:10px 12px;box-shadow:var(--shadow);width:100%;text-align:left;
+}
+.entry .time{font-size:13px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--muted)}
+.entry .what{display:grid;gap:1px;min-width:0}
+.entry .name{font-size:14px;font-weight:600;color:var(--hue)}
+.entry .meta{font-size:11.5px;color:var(--faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.entry .edit{font-size:11px;color:var(--faint);letter-spacing:.06em;text-transform:uppercase}
+.e-nc{--hue:var(--nc-ink)} .e-toilet{--hue:var(--wet-ink)} .e-tantrum{--hue:var(--tan-ink)}
+.empty{
+  border:1px dashed var(--line);border-radius:13px;padding:18px 14px;text-align:center;
+  color:var(--faint);font-size:13.5px;
+}
+
+/* ── Week chart ── */
+.week{
+  background:var(--surface);border:1px solid var(--line-soft);border-radius:16px;
+  padding:13px 14px;box-shadow:var(--shadow);display:grid;gap:12px;
+}
+.wrow{display:grid;gap:6px}
+.wtop{display:flex;align-items:baseline;justify-content:space-between}
+.wname{font-size:12px;font-weight:600;color:var(--hue)}
+.wtot{font-size:12px;color:var(--faint);font-variant-numeric:tabular-nums}
+.bars{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;align-items:end;height:38px}
+.bar{
+  background:color-mix(in srgb,var(--hue) 22%,transparent);
+  border-radius:4px 4px 2px 2px;min-height:3px;position:relative;
+}
+.bar[data-sel="yes"]{background:var(--hue)}
+.bar span{
+  position:absolute;top:-14px;left:0;right:0;text-align:center;
+  font-size:10px;font-weight:600;color:var(--muted);font-variant-numeric:tabular-nums;
+}
+.wdays{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;font-size:10px;color:var(--faint);text-align:center}
+.w-nc{--hue:var(--nc-ink)} .w-toilet{--hue:var(--wet-ink)} .w-tantrum{--hue:var(--tan-ink)}
+
+/* ── Episode / timer panel ── */
+.panel{
+  background:var(--nc-wash);border:1px solid color-mix(in srgb,var(--nc) 35%,transparent);
+  border-radius:16px;padding:12px 13px;display:grid;gap:10px;
+}
+.panel .ptop{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.panel .ptitle{font-size:13px;font-weight:700;color:var(--nc-ink)}
+.panel .pclock{font-size:13px;font-weight:600;color:var(--nc-ink);font-variant-numeric:tabular-nums}
+.panel .prow{display:flex;gap:8px}
+.panel .prow button{
+  flex:1;border-radius:12px;padding:11px 8px;font-size:13.5px;font-weight:600;
+  background:var(--surface);border:1px solid color-mix(in srgb,var(--nc) 30%,transparent);
+}
+.panel .pnote{font-size:11.5px;color:var(--muted);margin:0}
+
+/* ── Dock ── */
+.dock{
+  position:fixed;left:0;right:0;bottom:0;z-index:8;
+  width:min(560px,100%);margin:0 auto;
+  padding:10px 14px calc(10px + env(safe-area-inset-bottom));
+  background:color-mix(in srgb,var(--surface) 92%,transparent);
+  backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  border-top:1px solid var(--line);box-shadow:var(--shadow-dock);
+  display:grid;gap:9px;
+}
+.dockmain{display:grid}
+/* The three counts are the primary action; the latency timer is an
+   optional assist, so it sits above them as a quiet secondary control. */
+.timerlink{
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  border:1px dashed color-mix(in srgb,var(--nc) 45%,transparent);
+  color:var(--nc-ink);background:transparent;border-radius:12px;
+  padding:9px 12px;font-size:13px;font-weight:600;
+}
+.timerlink .sub{font-weight:500;color:var(--muted)}
+.running{
+  display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:11px;
+  background:var(--nc-wash);border:1.5px solid var(--nc);border-radius:15px;padding:8px 10px;
+}
+.ring{width:54px;height:54px;flex:none;display:block}
+.ring circle{fill:none;stroke-width:6;stroke-linecap:round}
+.ring .track{stroke:color-mix(in srgb,var(--nc) 22%,transparent)}
+.ring .lead{stroke:var(--nc);transform:rotate(-90deg);transform-origin:50% 50%;transition:stroke-dashoffset .1s linear}
+.ring text{
+  font-family:'Archivo',sans-serif;font-size:18px;font-weight:700;fill:var(--nc-ink);
+  text-anchor:middle;font-variant-numeric:tabular-nums;
+}
+.started{
+  background:var(--good);color:#fff;border-radius:12px;padding:15px 10px;
+  font-size:15.5px;font-weight:700;height:100%;
+}
+.cancel{
+  width:44px;border-radius:12px;border:1px solid color-mix(in srgb,var(--nc) 30%,transparent);
+  color:var(--muted);font-size:19px;background:var(--surface);
+}
+.quick{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.q{
+  display:grid;gap:4px;justify-items:center;align-content:center;
+  min-height:84px;padding:12px 6px;border-radius:16px;
+  border:1.5px solid color-mix(in srgb,var(--hue) 30%,var(--line));
+  background:color-mix(in srgb,var(--hue) 7%,var(--surface));
+  transition:transform .09s ease, background .15s ease;
+}
+.q:active{transform:scale(.96)}
+.q .qn{
+  font-family:'Fraunces','Iowan Old Style',Georgia,serif;font-weight:700;font-size:30px;line-height:1;
+  color:var(--hue);font-variant-numeric:tabular-nums;
+}
+.q .ql{font-size:10.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);text-align:center;line-height:1.2}
+.q-nc{--hue:var(--nc-ink)} .q-wet{--hue:var(--wet-ink)} .q-tan{--hue:var(--tan-ink)}
+.q.pop{background:color-mix(in srgb,var(--hue) 26%,var(--surface))}
+
+/* ── Toast ── */
+.toast{
+  position:fixed;left:50%;transform:translateX(-50%);
+  bottom:calc(200px + env(safe-area-inset-bottom));z-index:9;
+  width:min(532px,calc(100% - 28px));
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  background:var(--ink);color:var(--bg);border-radius:13px;padding:11px 13px;
+  font-size:13.5px;font-weight:500;box-shadow:var(--shadow);
+}
+.toast button{
+  font-weight:700;font-size:13px;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--bg);border-bottom:1.5px solid currentColor;padding-bottom:1px;
+}
+
+/* ── Sheet ── */
+.scrim{
+  position:fixed;inset:0;z-index:10;background:rgba(10,16,20,.5);
+  display:flex;align-items:flex-end;justify-content:center;padding:14px;
+}
+.sheet{
+  width:min(532px,100%);background:var(--surface);border-radius:20px;
+  padding:18px 16px calc(18px + env(safe-area-inset-bottom));
+  box-shadow:var(--shadow);display:grid;gap:14px;max-height:88vh;overflow-y:auto;
+}
+.sheet h3{margin:0;font-family:'Fraunces',Georgia,serif;font-weight:600;font-size:21px}
+.field{display:grid;gap:5px}
+.field label{font-size:11.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--faint)}
+.field input,.field select,.field textarea{
+  font:inherit;color:var(--ink);background:var(--surface-2);
+  border:1px solid var(--line);border-radius:11px;padding:11px 12px;width:100%;
+}
+.field textarea{resize:vertical;min-height:60px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.sheetacts{display:flex;gap:8px;margin-top:2px}
+.sheetacts button{flex:1;border-radius:12px;padding:13px 10px;font-size:14.5px;font-weight:600}
+.primary{background:var(--ink);color:var(--bg)}
+.secondary{background:var(--surface-2);border:1px solid var(--line);color:var(--muted)}
+.danger{background:var(--tan-wash);color:var(--tan-ink);border:1px solid color-mix(in srgb,var(--tan) 30%,transparent)}
+.toggles{display:grid;gap:9px}
+.toggle{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:14px}
+.toggle input{width:auto}
+
+@media (prefers-reduced-motion: reduce){
+  *{animation:none !important;transition:none !important}
+}
+</style>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ───────────────────────── Behaviors ─────────────────────────
+     Operational definitions live here so the UI, the CSV, and the
+     summary all speak the same language.                         */
+  const B = {
+    nc:      { label:"Non-compliance",     short:"Non-compliance", cls:"nc",
+               def:"No initiation of a stated instruction within {latency}s of delivery. Ends when Paul begins the task or appropriately asks for help or a break. New occurrence after a new instruction or {engagement}s of task engagement." },
+    toilet:  { label:"Toileting accident", short:"Accident",       cls:"toilet",
+               def:"Urination or bowel movement outside the toilet." },
+    tantrum: { label:"Tantrum",            short:"Tantrum",        cls:"tantrum",
+               def:"Onset of a tantrum episode." }
+  };
+  const TYPES = ["nc","toilet","tantrum"];
+  const K = { data:"pbl.data", timer:"pbl.timer" };
+  const DEFAULTS = { child:"Paul", recorder:"Me", latency:10, engagement:30, alert:true };
+
+  /* ───────────────────────── Helpers ───────────────────────── */
+  const $  = (s, r) => (r || document).querySelector(s);
+  const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
+  const pad = n => String(n).padStart(2, "0");
+  const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c =>
+    ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
+
+  function dayKey(ts){ const d = new Date(ts); return d.getFullYear() + "-" + pad(d.getMonth()+1) + "-" + pad(d.getDate()); }
+  function keyToDate(k){ const p = k.split("-").map(Number); return new Date(p[0], p[1]-1, p[2]); }
+  function shiftKey(k, days){ const d = keyToDate(k); d.setDate(d.getDate()+days); return dayKey(d); }
+  function clockOf(ts){ const d = new Date(ts); let h = d.getHours(); const m = pad(d.getMinutes());
+    const ap = h >= 12 ? "pm" : "am"; h = h % 12 || 12; return h + ":" + m + " " + ap; }
+  function longDate(k){ return keyToDate(k).toLocaleDateString(undefined, { weekday:"short", month:"short", day:"numeric" }); }
+  function shortDate(k){ return keyToDate(k).toLocaleDateString(undefined, { month:"short", day:"numeric" }); }
+  function mmss(sec){ sec = Math.max(0, Math.ceil(sec)); return Math.floor(sec/60) + ":" + pad(sec%60); }
+  function uid(){ return S.dev + "-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2,6); }
+  function clamp(n, lo, hi){ return Math.min(hi, Math.max(lo, n)); }
+
+  /* ───────────────────────── State ─────────────────────────
+     own    : events created on THIS device, bucketed by day
+     edits  : this device's edits/deletions, keyed by event id
+     remote : the same two things from a partner's device, live      */
+  const S = {
+    dev:"", settings:Object.assign({}, DEFAULTS),
+    own:{}, edits:{},
+    shared:{}, sharedEdits:{},   // logs merged in from the other phone
+    day:dayKey(Date.now()),
+    timer:null,      // { startedAt }
+    pending:null,    // a shared log waiting to be merged
+    episode:null,    // { id, startedAt, endedAt }
+    lastLogged:null, // for undo
+    _cache:null
+  };
+
+  function load(){
+    let raw = null;
+    try { raw = JSON.parse(localStorage.getItem(K.data) || "null"); } catch (e) { raw = null; }
+    if (raw) {
+      S.dev = raw.dev || "";
+      Object.assign(S.settings, raw.settings || {});
+      S.own = raw.own || {}; S.edits = raw.edits || {};
+      S.shared = raw.shared || {}; S.sharedEdits = raw.sharedEdits || {};
+      S.episode = raw.episode || null;
+    }
+    if (!S.dev) S.dev = "d" + Math.random().toString(36).slice(2, 8);
+    try { S.timer = JSON.parse(localStorage.getItem(K.timer) || "null"); } catch (e) { S.timer = null; }
+  }
+  function save(){
+    S._cache = null;
+    try {
+      localStorage.setItem(K.data, JSON.stringify({
+        dev:S.dev, settings:S.settings, own:S.own, edits:S.edits,
+        shared:S.shared, sharedEdits:S.sharedEdits, episode:S.episode
+      }));
+    } catch (e) {}
+  }
+  function saveTimer(){ try { S.timer ? localStorage.setItem(K.timer, JSON.stringify(S.timer)) : localStorage.removeItem(K.timer); } catch (e) {} }
+
+  /* ───────────────────── Derived: merged log ───────────────────── */
+  function allEvents(){
+    if (S._cache) return S._cache;
+    const base = new Map();
+    const take = days => { for (const d in days) for (const ev of days[d]) if (ev && ev.id) base.set(ev.id, ev); };
+    take(S.own);
+    for (const dev in S.shared) take(S.shared[dev]);
+
+    const edits = {};
+    const merge = src => { for (const id in src) { const cur = edits[id];
+      if (!cur || (src[id].rev || 0) > (cur.rev || 0)) edits[id] = src[id]; } };
+    merge(S.edits);
+    for (const dev in S.sharedEdits) merge(S.sharedEdits[dev]);
+
+    const out = [];
+    base.forEach(ev => {
+      const ed = edits[ev.id];
+      const e = ed ? Object.assign({}, ev, ed) : ev;
+      if (!e.deleted) out.push(e);
+    });
+    out.sort((a, b) => a.ts - b.ts);
+    S._cache = out;
+    return out;
+  }
+  function eventsOn(key){ return allEvents().filter(e => dayKey(e.ts) === key); }
+  function countsOn(key){
+    const c = { nc:0, toilet:0, tantrum:0 };
+    for (const e of eventsOn(key)) if (c[e.type] != null) c[e.type]++;
+    return c;
+  }
+
+  /* ───────────────────── Sharing between two phones ─────────────────────
+     No accounts and no server: a phone packs its own records into a link,
+     the other phone opens it and merges. Each phone only ever ships what
+     it recorded itself, so neither can overwrite the other's entries.   */
+  function b64e(str){
+    const bytes = new TextEncoder().encode(str);
+    let bin = ""; bytes.forEach(b => bin += String.fromCharCode(b));
+    return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
+  function b64d(str){
+    const bin = atob(str.replace(/-/g, "+").replace(/_/g, "/"));
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return new TextDecoder().decode(bytes);
+  }
+
+  const SHARE_DAYS = 30;
+  function sharePayload(){
+    const cutoff = shiftKey(dayKey(Date.now()), -(SHARE_DAYS - 1));
+    const days = {};
+    for (const d in S.own) if (d >= cutoff && S.own[d].length) {
+      days[d] = S.own[d].map(e => [e.type, e.ts, e.by || "", e.note || "", e.endedAt || 0, e.resolution || ""]);
+    }
+    return { v:1, dev:S.dev, by:S.settings.recorder, days:days, edits:S.edits };
+  }
+  function shareUrl(){
+    const base = location.href.split("#")[0];
+    return base + "#log=" + b64e(JSON.stringify(sharePayload()));
+  }
+  function countPayload(pl){
+    let n = 0; for (const d in pl.days) n += pl.days[d].length; return n;
+  }
+  function mergePayload(pl){
+    const dev = pl.dev;
+    if (!dev || dev === S.dev) return 0;
+    const mine = S.shared[dev] = S.shared[dev] || {};
+    let n = 0;
+    for (const d in pl.days) {
+      mine[d] = pl.days[d].map(r => ({
+        id:dev + "-" + Number(r[1]).toString(36) + "-" + r[0], type:r[0], ts:r[1], by:r[2] || pl.by || "",
+        dev:dev, note:r[3] || "", endedAt:r[4] || undefined, resolution:r[5] || ""
+      }));
+      n += mine[d].length;
+    }
+    S.sharedEdits[dev] = pl.edits || {};
+    S._cache = null; save();
+    return n;
+  }
+  function readHashPayload(){
+    const m = /[#&]log=([A-Za-z0-9\-_]+)/.exec(location.hash || "");
+    if (!m) return null;
+    try { return JSON.parse(b64d(m[1])); } catch (e) { return null; }
+  }
+  function clearHash(){
+    try { history.replaceState(null, "", location.href.split("#")[0]); }
+    catch (e) { location.hash = ""; }
+  }
+
+  /* ───────────────────── Recording ───────────────────── */
+  function addEvent(type, ts, extra){
+    const ev = Object.assign({
+      id:uid(), type:type, ts:ts || Date.now(), by:S.settings.recorder, dev:S.dev, note:""
+    }, extra || {});
+    const key = dayKey(ev.ts);
+    (S.own[key] = S.own[key] || []).push(ev);
+    save();
+    return ev;
+  }
+  function patchEvent(id, patch){
+    const ev = allEvents().find(e => e.id === id);
+    const oldKey = ev ? dayKey(ev.ts) : null;
+    const mine = S.own[oldKey] && S.own[oldKey].some(e => e.id === id);
+    if (mine) {
+      // Our own record: edit it in place so the day bucket stays truthful.
+      const list = S.own[oldKey];
+      const i = list.findIndex(e => e.id === id);
+      const merged = Object.assign({}, list[i], patch);
+      if (patch.deleted) { list.splice(i, 1); }
+      else if (dayKey(merged.ts) !== oldKey) {
+        list.splice(i, 1);
+        const nk = dayKey(merged.ts);
+        (S.own[nk] = S.own[nk] || []).push(merged);
+      } else { list[i] = merged; }
+      save();
+    } else {
+      // The other phone's record: keep theirs intact, record our change beside it.
+      S.edits[id] = Object.assign({}, S.edits[id], patch, { rev:Date.now() });
+      save();
+    }
+    S._cache = null;
+  }
+
+  function log(type, ts, extra){
+    const ev = addEvent(type, ts, extra);
+    S.lastLogged = ev.id;
+    pop(type);
+    toast(B[type].short + " logged at " + clockOf(ev.ts), "undo");
+    renderAll();
+    return ev;
+  }
+  function undoLast(){
+    if (!S.lastLogged) return;
+    patchEvent(S.lastLogged, { deleted:true, rev:Date.now() });
+    if (S.episode && S.episode.id === S.lastLogged) { S.episode = null; }
+    S.lastLogged = null; save(); hideToast(); renderAll();
+  }
+
+  /* ───────────────────── The 10-second window ───────────────────── */
+  function startInstruction(){
+    beepReady();
+    S.timer = { startedAt:Date.now() };
+    saveTimer(); renderDock(); tick();
+  }
+  function cancelInstruction(started){
+    S.timer = null; saveTimer();
+    if (started) toast("Paul started — nothing counted", null);
+    renderAll();
+  }
+  function expireInstruction(){
+    const onset = S.timer.startedAt + S.settings.latency * 1000;
+    S.timer = null; saveTimer();
+    const ev = log("nc", onset, { latency:S.settings.latency });
+    S.episode = { id:ev.id, startedAt:onset, endedAt:null };
+    save(); alertParent(); renderAll();
+  }
+  function endEpisode(reason){
+    if (!S.episode) return;
+    const ended = Date.now();
+    patchEvent(S.episode.id, { endedAt:ended, resolution:reason, rev:Date.now() });
+    S.episode = { id:S.episode.id, startedAt:S.episode.startedAt, endedAt:ended };
+    save(); renderAll();
+  }
+
+  let ticker = null;
+  function tick(){
+    clearInterval(ticker);
+    ticker = setInterval(() => {
+      if (S.timer) {
+        const left = S.settings.latency - (Date.now() - S.timer.startedAt) / 1000;
+        if (left <= 0) { expireInstruction(); return; }
+        paintRing(left);
+      }
+      if (S.episode) renderEpisode();
+      if (!S.timer && !S.episode) { clearInterval(ticker); ticker = null; }
+    }, 100);
+  }
+  function paintRing(left){
+    const t = $("[data-role='ringlead']"), n = $("[data-role='ringnum']");
+    if (!t || !n) return;
+    const C = 138.23;
+    t.setAttribute("stroke-dashoffset", String(C * (1 - clamp(left / S.settings.latency, 0, 1))));
+    n.textContent = String(Math.ceil(left));
+  }
+
+  /* ───────────────────── Alerts ───────────────────── */
+  let AC = null;
+  function beepReady(){
+    if (!S.settings.alert || AC) return;
+    try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { AC = null; }
+    if (AC && AC.state === "suspended") AC.resume();
+  }
+  function alertParent(){
+    if (!S.settings.alert) return;
+    if (navigator.vibrate) { try { navigator.vibrate([40, 60, 40]); } catch (e) {} }
+    if (!AC) return;
+    try {
+      const o = AC.createOscillator(), g = AC.createGain(), t = AC.currentTime;
+      o.type = "sine"; o.frequency.setValueAtTime(880, t);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.16, t + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.28);
+      o.connect(g); g.connect(AC.destination); o.start(t); o.stop(t + 0.3);
+    } catch (e) {}
+  }
+
+  /* ───────────────────── Render ───────────────────── */
+  function renderAll(){
+    const st = S.settings;
+    $("[data-role='child']").textContent = st.child;
+    $("[data-role='recorder']").textContent = st.recorder;
+    const today = dayKey(Date.now());
+    const lab = $("[data-role='daylabel']");
+    lab.textContent = S.day === today ? "Today · " + longDate(S.day)
+      : S.day === shiftKey(today, -1) ? "Yesterday · " + longDate(S.day) : longDate(S.day);
+    lab.setAttribute("data-today", S.day === today ? "yes" : "no");
+
+    const dot = $("[data-role='sync']");
+    dot.setAttribute("data-state", Object.keys(S.shared).length ? "live" : "solo");
+    dot.title = Object.keys(S.shared).length ? "Includes a log shared from another phone" : "This phone only";
+    $("[data-act='next-day']").disabled = S.day >= today;
+
+    renderTiles(); renderEpisode(); renderTimeline(); renderWeek(); renderDock();
+  }
+
+  function renderTiles(){
+    const c = countsOn(S.day);
+    let sums = { nc:0, toilet:0, tantrum:0 };
+    for (let i = 0; i < 7; i++) {
+      const d = countsOn(shiftKey(S.day, -i));
+      TYPES.forEach(t => sums[t] += d[t]);
+    }
+    $("[data-role='tiles']").innerHTML = TYPES.map(t => `
+      <div class="tile t-${t}">
+        <span class="n">${c[t]}</span>
+        <span class="l">${esc(B[t].short)}</span>
+        <span class="avg">${(sums[t] / 7).toFixed(1)}/day avg</span>
+      </div>`).join("");
+    TYPES.forEach(t => { const n = $("[data-count='" + t + "']"); if (n) n.textContent = c[t]; });
+  }
+
+  function renderEpisode(){
+    const el = $("[data-role='episode']");
+    if (!S.episode) { el.hidden = true; el.innerHTML = ""; return; }
+    const st = S.settings;
+    el.hidden = false;
+    if (!S.episode.endedAt) {
+      const open = (Date.now() - S.episode.startedAt) / 1000;
+      el.innerHTML = `
+        <div class="ptop">
+          <span class="ptitle">Episode open</span>
+          <span class="pclock">${mmss(open)}</span>
+        </div>
+        <p class="pnote">Ends when ${esc(st.child)} begins the task or appropriately asks for help or a break.</p>
+        <div class="prow">
+          <button data-act="end-episode" data-reason="began task">Began the task</button>
+          <button data-act="end-episode" data-reason="asked for help or break">Asked for help / break</button>
+        </div>`;
+      if (!ticker) tick();
+      return;
+    }
+    const eng = (Date.now() - S.episode.endedAt) / 1000;
+    if (eng >= st.engagement) { S.episode = null; save(); el.hidden = true; el.innerHTML = ""; return; }
+    el.innerHTML = `
+      <div class="ptop">
+        <span class="ptitle">Engaged ${mmss(eng)}</span>
+        <span class="pclock">${mmss(st.engagement - eng)} to a new occurrence</span>
+      </div>
+      <p class="pnote">A new instruction counts on its own. Without one, non-compliance counts again only after ${st.engagement}s of task engagement.</p>`;
+    if (!ticker) tick();
+  }
+
+  function renderTimeline(){
+    const list = eventsOn(S.day).slice().reverse();
+    const el = $("[data-role='timeline']");
+    if (!list.length) {
+      el.innerHTML = `<li class="empty">Nothing recorded ${S.day === dayKey(Date.now()) ? "yet today" : "this day"}.</li>`;
+      return;
+    }
+    el.innerHTML = list.map(e => {
+      const bits = [];
+      if (e.by) bits.push(esc(e.by));
+      if (e.endedAt) bits.push(mmss((e.endedAt - e.ts) / 1000) + (e.resolution ? " · " + esc(e.resolution) : ""));
+      if (e.note) bits.push(esc(e.note));
+      return `
+        <li><button class="entry e-${e.type}" data-act="open-entry" data-id="${esc(e.id)}">
+          <span class="time">${clockOf(e.ts)}</span>
+          <span class="what">
+            <span class="name">${esc(B[e.type].short)}</span>
+            <span class="meta">${bits.join(" · ") || "&nbsp;"}</span>
+          </span>
+          <span class="edit">Edit</span>
+        </button></li>`;
+    }).join("");
+  }
+
+  function renderWeek(){
+    const days = [];
+    for (let i = 6; i >= 0; i--) days.push(shiftKey(S.day, -i));
+    const data = days.map(countsOn);
+    $("[data-role='weekrange']").textContent = shortDate(days[0]) + " – " + shortDate(days[6]);
+    $("[data-role='week']").innerHTML = TYPES.map(t => {
+      const vals = data.map(d => d[t]);
+      const max = Math.max(1, ...vals);
+      const tot = vals.reduce((a, b) => a + b, 0);
+      return `
+        <div class="wrow w-${t}">
+          <div class="wtop">
+            <span class="wname">${esc(B[t].short)}</span>
+            <span class="wtot">${tot} in 7 days</span>
+          </div>
+          <div class="bars">${vals.map((v, i) => `
+            <div class="bar" style="height:${Math.max(3, Math.round(v / max * 38))}px" data-sel="${i === 6 ? "yes" : "no"}">
+              ${v ? `<span>${v}</span>` : ""}
+            </div>`).join("")}</div>
+          <div class="wdays">${days.map(d => `<span>${keyToDate(d).toLocaleDateString(undefined, { weekday:"narrow" })}</span>`).join("")}</div>
+        </div>`;
+    }).join("");
+  }
+
+  function renderDock(){
+    const el = $("[data-role='dockmain']"), st = S.settings;
+    if (S.timer) {
+      const left = st.latency - (Date.now() - S.timer.startedAt) / 1000;
+      el.innerHTML = `
+        <div class="running">
+          <svg class="ring" viewBox="0 0 60 60" aria-hidden="true">
+            <circle class="track" cx="30" cy="30" r="22"></circle>
+            <circle class="lead" data-role="ringlead" cx="30" cy="30" r="22"
+                    stroke-dasharray="138.23" stroke-dashoffset="0"></circle>
+            <text x="30" y="36" data-role="ringnum">${Math.ceil(left)}</text>
+          </svg>
+          <button class="started" data-act="started">${esc(st.child)} started</button>
+          <button class="cancel" data-act="cancel-timer" aria-label="Cancel timer">&times;</button>
+        </div>`;
+      paintRing(left);
+    } else {
+      el.innerHTML = `
+        <button class="timerlink" data-act="instruction">
+          Time an instruction<span class="sub">${st.latency}s window, hands-free</span>
+        </button>`;
+    }
+  }
+
+  function pop(type){
+    const b = $(".q[data-type='" + type + "']");
+    if (!b) return;
+    b.classList.add("pop");
+    setTimeout(() => b.classList.remove("pop"), 260);
+  }
+
+  let toastTimer = null;
+  function toast(text, action){
+    const el = $("[data-role='toast']");
+    $("[data-role='toast-text']").textContent = text;
+    $("[data-act='undo']").hidden = action !== "undo";
+    el.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(hideToast, 6000);
+  }
+  function hideToast(){ $("[data-role='toast']").hidden = true; }
+
+  /* ───────────────────── Sheets ───────────────────── */
+  function openSheet(html){
+    $("[data-role='sheet']").innerHTML = html;
+    $("[data-role='scrim']").hidden = false;
+  }
+  function closeSheet(){ $("[data-role='scrim']").hidden = true; $("[data-role='sheet']").innerHTML = ""; }
+
+  function dateValue(ts){ const d = new Date(ts); return d.getFullYear() + "-" + pad(d.getMonth()+1) + "-" + pad(d.getDate()); }
+  function timeValue(ts){ const d = new Date(ts); return pad(d.getHours()) + ":" + pad(d.getMinutes()); }
+  function readWhen(orig){
+    const d = $("#f-date").value.split("-").map(Number);
+    const t = $("#f-time").value.split(":").map(Number);
+    if (!d[0] || isNaN(t[0])) return orig || Date.now();
+    const ts = new Date(d[0], d[1]-1, d[2], t[0], t[1] || 0).getTime();
+    // The picker only offers minutes: keep the original seconds when the
+    // minute is untouched, so saving a note doesn't reshuffle the day.
+    if (orig && Math.floor(orig / 60000) === Math.floor(ts / 60000)) return orig;
+    return ts;
+  }
+
+  function entrySheet(ev){
+    const isNew = !ev;
+    const ts = ev ? ev.ts : Date.now();
+    openSheet(`
+      <h3>${isNew ? "Add an entry" : "Edit entry"}</h3>
+      <div class="field">
+        <label for="f-type">Behavior</label>
+        <select id="f-type" ${isNew ? "" : "disabled"}>
+          ${TYPES.map(t => `<option value="${t}" ${ev && ev.type === t ? "selected" : ""}>${esc(B[t].label)}</option>`).join("")}
+        </select>
+      </div>
+      <div class="row2">
+        <div class="field"><label for="f-date">Date</label><input id="f-date" type="date" value="${dateValue(ts)}"></div>
+        <div class="field"><label for="f-time">Time</label><input id="f-time" type="time" value="${timeValue(ts)}"></div>
+      </div>
+      <div class="field">
+        <label for="f-note">Note (optional)</label>
+        <textarea id="f-note" placeholder="What was asked, what happened, what helped">${esc(ev ? ev.note : "")}</textarea>
+      </div>
+      <div class="sheetacts">
+        ${isNew ? "" : `<button class="danger" data-act="delete-entry" data-id="${esc(ev.id)}">Delete</button>`}
+        <button class="secondary" data-act="close-sheet">Cancel</button>
+        <button class="primary" data-act="${isNew ? "save-new" : "save-entry"}" ${isNew ? "" : `data-id="${esc(ev.id)}"`}>Save</button>
+      </div>`);
+  }
+
+  function settingsSheet(){
+    const st = S.settings;
+    openSheet(`
+      <h3>Settings</h3>
+      <div class="row2">
+        <div class="field"><label for="s-child">Child</label><input id="s-child" type="text" value="${esc(st.child)}"></div>
+        <div class="field"><label for="s-rec">Who's logging</label><input id="s-rec" type="text" value="${esc(st.recorder)}"></div>
+      </div>
+      <div class="row2">
+        <div class="field"><label for="s-lat">Latency window (s)</label><input id="s-lat" type="number" min="3" max="60" value="${st.latency}"></div>
+        <div class="field"><label for="s-eng">Engagement (s)</label><input id="s-eng" type="number" min="5" max="300" value="${st.engagement}"></div>
+      </div>
+      <div class="toggles">
+        <label class="toggle"><span>Buzz and chime when the window runs out</span>
+          <input id="s-alert" type="checkbox" ${st.alert ? "checked" : ""}></label>
+      </div>
+      <p class="hint"><strong>Non-compliance</strong> — ${esc(B.nc.def.replace("{latency}", st.latency).replace("{engagement}", st.engagement))}</p>
+      <p class="hint">Entries live on this phone. Use <strong>Share my log</strong> to send them
+      to the other phone${Object.keys(S.shared).length ? ", which has already shared one back" : ""}.</p>
+      <div class="sheetacts">
+        <button class="secondary" data-act="close-sheet">Cancel</button>
+        <button class="primary" data-act="save-settings">Save</button>
+      </div>`);
+  }
+
+  function importSheet(){
+    openSheet(`
+      <h3>Merge a shared log</h3>
+      <p class="hint">Paste the link the other phone sent you. Only their own entries come
+      across, so nothing you recorded here is touched.</p>
+      <div class="field">
+        <label for="f-link">Shared link</label>
+        <textarea id="f-link" placeholder="Paste here"></textarea>
+      </div>
+      <div class="sheetacts">
+        <button class="secondary" data-act="close-sheet">Cancel</button>
+        <button class="primary" data-act="do-import">Merge</button>
+      </div>`);
+  }
+
+  function offerMerge(pl){
+    const n = countPayload(pl);
+    const dates = Object.keys(pl.days || {}).sort();
+    openSheet(`
+      <h3>${esc(pl.by || "Another phone")}'s log</h3>
+      <p class="hint">${n} ${n === 1 ? "entry" : "entries"}${dates.length ? ", " + shortDate(dates[0]) + " – " + shortDate(dates[dates.length-1]) : ""}.
+      Merging keeps both logs in one place on this phone.</p>
+      <div class="sheetacts">
+        <button class="secondary" data-act="skip-merge">Not now</button>
+        <button class="primary" data-act="do-merge">Merge ${n}</button>
+      </div>`);
+    S.pending = pl;
+  }
+
+  async function shareLog(){
+    const url = shareUrl();
+    const n = countPayload(sharePayload());
+    const text = S.settings.recorder + "'s log for " + S.settings.child + " — " + n + " entries";
+    if (navigator.share) {
+      try { await navigator.share({ title:S.settings.child + " — behavior log", text:text, url:url }); return; }
+      catch (e) { if (e && e.name === "AbortError") return; }
+    }
+    copyOut("Link", url);
+  }
+
+  function textSheet(title, body){
+    openSheet(`
+      <h3>${esc(title)}</h3>
+      <p class="hint">Press and hold to select all, then copy.</p>
+      <div class="field"><textarea id="f-out" readonly style="min-height:220px;font-size:12.5px">${esc(body)}</textarea></div>
+      <div class="sheetacts"><button class="primary" data-act="close-sheet">Done</button></div>`);
+    const ta = $("#f-out"); if (ta) { ta.focus(); ta.select(); }
+  }
+
+  /* ───────────────────── Export ───────────────────── */
+  function csv(){
+    const rows = [["date","time","behavior","recorded_by","duration_sec","resolution","note","id"]];
+    for (const e of allEvents()) {
+      rows.push([
+        dayKey(e.ts), timeValue(e.ts), B[e.type].label, e.by || "",
+        e.endedAt ? Math.round((e.endedAt - e.ts) / 1000) : "",
+        e.resolution || "", e.note || "", e.id
+      ]);
+    }
+    return rows.map(r => r.map(v => {
+      const s = String(v);
+      return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+    }).join(",")).join("\n");
+  }
+
+  function summary(){
+    const days = [];
+    for (let i = 6; i >= 0; i--) days.push(shiftKey(S.day, -i));
+    const st = S.settings;
+    const tot = { nc:0, toilet:0, tantrum:0 };
+    const lines = days.map(d => {
+      const c = countsOn(d);
+      TYPES.forEach(t => tot[t] += c[t]);
+      return "  " + longDate(d) + " — non-compliance " + c.nc + ", accidents " + c.toilet + ", tantrums " + c.tantrum;
+    });
+    return [
+      st.child + " — behavior data, " + shortDate(days[0]) + " to " + shortDate(days[6]),
+      "",
+      "Non-compliance:      " + tot.nc + " total (" + (tot.nc / 7).toFixed(1) + "/day)",
+      "Toileting accidents: " + tot.toilet + " total (" + (tot.toilet / 7).toFixed(1) + "/day)",
+      "Tantrums:            " + tot.tantrum + " total (" + (tot.tantrum / 7).toFixed(1) + "/day)",
+      "",
+      "By day:", lines.join("\n"), "",
+      "Non-compliance is counted when " + st.child + " does not begin or attempt a stated",
+      "instruction within " + st.latency + " seconds of delivery. A new occurrence follows a new",
+      "instruction or " + st.engagement + " seconds of task engagement."
+    ].join("\n");
+  }
+
+  async function copyOut(label, text){
+    try {
+      await navigator.clipboard.writeText(text);
+      toast(label + " copied", null);
+      return;
+    } catch (e) {}
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
+      document.body.appendChild(ta); ta.select();
+      const ok = document.execCommand("copy");
+      document.body.removeChild(ta);
+      if (ok) { toast(label + " copied", null); return; }
+    } catch (e) {}
+    textSheet(label, text);
+  }
+
+  async function saveCsv(){
+    const name = S.settings.child.toLowerCase().replace(/[^a-z0-9]+/g, "-") + "-behavior-" + dayKey(Date.now()) + ".csv";
+    const text = csv();
+    let dl = null;
+    if (window.claude && typeof claude.use === "function") {
+      try { dl = await claude.use("downloads"); } catch (e) { dl = null; }
+    }
+    if (dl) {
+      try { await dl.save({ filename:name, data:text }); toast("CSV saved", null); }
+      catch (e) { toast("Download declined", null); }
+      return;
+    }
+    try {
+      const url = URL.createObjectURL(new Blob([text], { type:"text/csv" }));
+      const a = document.createElement("a");
+      a.href = url; a.download = name; document.body.appendChild(a); a.click();
+      document.body.removeChild(a); setTimeout(() => URL.revokeObjectURL(url), 2000);
+    } catch (e) { textSheet("CSV", text); }
+  }
+
+  /* ───────────────────── Wiring ───────────────────── */
+  document.addEventListener("click", ev => {
+    const el = ev.target.closest("[data-act]");
+    if (!el) return;
+    const act = el.getAttribute("data-act");
+
+    if (act === "log")            { log(el.getAttribute("data-type")); }
+    else if (act === "instruction") { startInstruction(); }
+    else if (act === "started")     { cancelInstruction(true); }
+    else if (act === "cancel-timer"){ cancelInstruction(false); }
+    else if (act === "end-episode") { endEpisode(el.getAttribute("data-reason")); }
+    else if (act === "undo")        { undoLast(); }
+    else if (act === "prev-day")    { S.day = shiftKey(S.day, -1); renderAll(); }
+    else if (act === "next-day")    { if (S.day < dayKey(Date.now())) { S.day = shiftKey(S.day, 1); renderAll(); } }
+    else if (act === "today")       { S.day = dayKey(Date.now()); renderAll(); }
+    else if (act === "settings")    { settingsSheet(); }
+    else if (act === "add-entry")   { entrySheet(null); }
+    else if (act === "open-entry")  {
+      const e = allEvents().find(x => x.id === el.getAttribute("data-id"));
+      if (e) entrySheet(e);
+    }
+    else if (act === "save-new") {
+      const ts = readWhen();
+      const t = $("#f-type").value;
+      addEvent(t, ts, { note:$("#f-note").value.trim() });
+      closeSheet(); S.day = dayKey(ts); renderAll();
+      toast(B[t].short + " added at " + clockOf(ts), null);
+    }
+    else if (act === "save-entry") {
+      const prev = allEvents().find(x => x.id === el.getAttribute("data-id"));
+      const ts = readWhen(prev ? prev.ts : null);
+      patchEvent(el.getAttribute("data-id"), { ts:ts, note:$("#f-note").value.trim(), rev:Date.now() });
+      closeSheet(); S.day = dayKey(ts); renderAll();
+    }
+    else if (act === "delete-entry") {
+      patchEvent(el.getAttribute("data-id"), { deleted:true, rev:Date.now() });
+      if (S.episode && S.episode.id === el.getAttribute("data-id")) { S.episode = null; save(); }
+      closeSheet(); renderAll(); toast("Entry deleted", null);
+    }
+    else if (act === "save-settings") {
+      S.settings.child     = ($("#s-child").value.trim() || DEFAULTS.child);
+      S.settings.recorder  = ($("#s-rec").value.trim() || DEFAULTS.recorder);
+      S.settings.latency   = clamp(parseInt($("#s-lat").value, 10) || DEFAULTS.latency, 3, 60);
+      S.settings.engagement= clamp(parseInt($("#s-eng").value, 10) || DEFAULTS.engagement, 5, 300);
+      S.settings.alert     = $("#s-alert").checked;
+      save(); closeSheet(); renderAll();
+    }
+    else if (act === "close-sheet") { closeSheet(); }
+    else if (act === "share-log")   { shareLog(); }
+    else if (act === "import-log")  { importSheet(); }
+    else if (act === "do-import")   {
+      const raw = $("#f-link").value.trim();
+      const m = /[#&]log=([A-Za-z0-9\-_]+)/.exec(raw) || /^([A-Za-z0-9\-_]{20,})$/.exec(raw);
+      let pl = null;
+      try { pl = m ? JSON.parse(b64d(m[1])) : null; } catch (e) { pl = null; }
+      if (!pl || !pl.days) { toast("That link didn't contain a log", null); return; }
+      const n = mergePayload(pl);
+      closeSheet(); renderAll();
+      toast(n ? (pl.by || "Their") + " log merged — " + n + " entries" : "Nothing new to merge", null);
+    }
+    else if (act === "do-merge")    {
+      const n = mergePayload(S.pending || {});
+      S.pending = null; clearHash(); closeSheet(); renderAll();
+      toast(n ? n + " entries merged" : "Nothing new to merge", null);
+    }
+    else if (act === "skip-merge")  { S.pending = null; clearHash(); closeSheet(); }
+    else if (act === "copy-summary"){ copyOut("Weekly summary", summary()); }
+    else if (act === "copy-csv")    { copyOut("CSV", csv()); }
+    else if (act === "save-csv")    { saveCsv(); }
+  });
+
+  $("[data-role='scrim']").addEventListener("click", ev => {
+    if (ev.target === $("[data-role='scrim']")) closeSheet();
+  });
+  document.addEventListener("keydown", ev => { if (ev.key === "Escape") closeSheet(); });
+
+  /* ───────────────────── Start ───────────────────── */
+  load();
+
+  // A window that ran out while the phone was asleep still counts —
+  // the onset was 10 seconds after the instruction, not now.
+  if (S.timer && Date.now() - S.timer.startedAt >= S.settings.latency * 1000) expireInstruction();
+
+  renderAll();
+  if (S.timer || S.episode) tick();
+
+  const incoming = readHashPayload();
+  if (incoming && incoming.dev !== S.dev) offerMerge(incoming);
+  else if (incoming) clearHash();
+
+  let seenDay = dayKey(Date.now());
+  setInterval(() => {
+    const now = dayKey(Date.now());
+    if (now !== seenDay) { if (S.day === seenDay) S.day = now; seenDay = now; renderAll(); }
+  }, 20000);
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState !== "visible") return;
+    if (S.timer && Date.now() - S.timer.startedAt >= S.settings.latency * 1000) expireInstruction();
+    else renderAll();
+  });
+})();
+</script>
+
+</body>
+</html>
