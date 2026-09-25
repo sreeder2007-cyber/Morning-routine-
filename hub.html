@@ -1,0 +1,931 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#f4efe8">
+<meta name="mobile-web-app-capable" content="yes">
+<title>Family Hub</title>
+<link rel="manifest" href="hub-manifest.json">
+<link rel="icon" href="hub-icon.svg" type="image/svg+xml">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f4efe8;
+    --card: #fffdfa;
+    --ink: #2b2520;
+    --muted: #857a70;
+    --line: #ebe3d8;
+    --soft: #f3ece2;
+    --shadow: 0 1px 2px rgba(60,40,20,.06), 0 8px 28px rgba(60,40,20,.07);
+    --radius: 22px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: Nunito, system-ui, sans-serif;
+    -webkit-tap-highlight-color: transparent;
+    overflow: hidden;
+  }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  input, select { font: inherit; color: inherit; }
+  [hidden] { display: none !important; }
+
+  .app { height: 100dvh; display: grid; grid-template-rows: auto 1fr; }
+
+  /* ── Top bar ── */
+  .top {
+    display: flex; align-items: center; gap: 28px;
+    padding: max(16px, env(safe-area-inset-top)) 24px 10px;
+  }
+  .clock { font-size: 68px; font-weight: 800; letter-spacing: -.03em; line-height: .95; font-variant-numeric: tabular-nums; }
+  .date { font-size: 24px; font-weight: 800; }
+  .status { font-size: 13px; color: var(--muted); font-weight: 600; margin-top: 2px; }
+  .status.warn { color: #b4432a; }
+  .wx { display: flex; align-items: center; gap: 18px; margin-left: auto; }
+  .wx-now { display: flex; align-items: center; gap: 8px; }
+  .wx-now .ic { font-size: 40px; }
+  .wx-now .tp { font-size: 38px; font-weight: 800; }
+  .wx-now .hl { font-size: 14px; color: var(--muted); font-weight: 700; line-height: 1.2; }
+  .wx-days { display: flex; gap: 14px; }
+  .wx-day { text-align: center; font-size: 13px; font-weight: 700; color: var(--muted); }
+  .wx-day .ic { font-size: 22px; display: block; }
+  .wx-day b { color: var(--ink); }
+  .tools { display: flex; gap: 8px; }
+  .icon-btn {
+    border: 0; background: var(--card); box-shadow: var(--shadow);
+    width: 52px; height: 52px; border-radius: 16px; font-size: 22px;
+    display: grid; place-items: center; text-decoration: none; color: inherit;
+  }
+
+  /* ── Main layout ── */
+  .main {
+    display: grid; grid-template-columns: minmax(0,1fr) 370px; gap: 16px;
+    padding: 6px 24px max(20px, env(safe-area-inset-bottom)); min-height: 0;
+  }
+  .week { display: grid; grid-template-columns: repeat(7, minmax(0,1fr)); gap: 10px; min-height: 0; }
+  .day {
+    background: var(--card); border-radius: 18px; box-shadow: var(--shadow);
+    display: flex; flex-direction: column; min-height: 0; overflow: hidden;
+  }
+  .day.today { background: #fff; box-shadow: 0 0 0 3px var(--ink), var(--shadow); }
+  .day h3 {
+    margin: 0; padding: 12px 12px 8px; font-size: 13px; letter-spacing: .08em;
+    text-transform: uppercase; color: var(--muted); font-weight: 800;
+  }
+  .day h3 b { display: block; font-size: 28px; color: var(--ink); letter-spacing: -.01em; text-transform: none; line-height: 1.05; }
+  .evs { overflow-y: auto; padding: 0 8px 12px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
+  .ev {
+    --c: #999; display: block; width: 100%; text-align: left; border: 0;
+    border-left: 5px solid var(--c); border-radius: 10px; padding: 6px 8px 7px 9px;
+    background: color-mix(in srgb, var(--c) 13%, white); font-size: 14.5px; line-height: 1.25;
+  }
+  .ev .t { font-weight: 800; font-size: 12.5px; color: color-mix(in srgb, var(--c) 72%, black); display: flex; gap: 6px; align-items: center; }
+  .ev .n { font-weight: 700; overflow-wrap: anywhere; }
+  .ev.allday { background: var(--c); color: #fff; border-left-color: rgba(0,0,0,.18); font-weight: 800; }
+  .ev.allday .n { font-weight: 800; }
+  .ev.past { opacity: .42; }
+  .ev.now { box-shadow: 0 0 0 2px var(--c); background: #fff; }
+  .dots { display: inline-flex; gap: 3px; margin-left: auto; }
+  .dots i { width: 8px; height: 8px; border-radius: 50%; background: var(--d); }
+  .ev.allday .dots i { box-shadow: 0 0 0 1.5px #fff; }
+  .empty-day { color: var(--muted); font-size: 13px; font-weight: 600; padding: 4px 4px; }
+
+  .welcome {
+    grid-column: 1 / -1; background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow);
+    padding: 32px; align-self: start; max-width: 720px;
+  }
+  .welcome h2 { margin: 0 0 8px; font-size: 30px; }
+  .welcome p, .welcome li { font-size: 17px; line-height: 1.5; color: #4d443d; }
+  .welcome .row { display: flex; gap: 10px; margin-top: 18px; flex-wrap: wrap; }
+
+  /* ── Side cards ── */
+  .side { display: flex; flex-direction: column; gap: 14px; min-height: 0; overflow-y: auto; padding-bottom: 4px; }
+  .card { background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow); padding: 16px 18px; }
+  .card h2 {
+    margin: 0 0 10px; font-size: 13px; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--muted); font-weight: 800; display: flex; align-items: center; gap: 8px;
+  }
+  .card h2 .aside { margin-left: auto; letter-spacing: 0; text-transform: none; font-weight: 600; }
+
+  .meal { display: flex; gap: 10px; align-items: baseline; padding: 5px 0; font-size: 19px; font-weight: 700; line-height: 1.3; }
+  .meal + .meal { border-top: 1px dashed var(--line); }
+  .meal .lbl { font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: #c0613f; min-width: 90px; }
+  .meal-tmrw { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); font-size: 14px; color: var(--muted); font-weight: 700; }
+  .meal-tmrw b { color: var(--ink); }
+  .hint { color: var(--muted); font-size: 14px; font-weight: 600; line-height: 1.45; }
+
+  .mail-who { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 16px; margin-top: 4px; }
+  .mail-who + .mail-who, .mail-list + .mail-who { margin-top: 12px; }
+  .mail-who .sw { width: 12px; height: 12px; border-radius: 50%; background: var(--c); }
+  .badge { margin-left: auto; background: var(--c); color: #fff; border-radius: 99px; padding: 2px 10px; font-size: 14px; }
+  .badge.zero { background: var(--soft); color: var(--muted); }
+  .mail-list { margin: 4px 0 0 20px; }
+  .mail-item { font-size: 14px; line-height: 1.3; padding: 3px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .mail-item b { font-weight: 800; }
+  .mail-item span { color: #5e544c; font-weight: 600; }
+  .mail-err { font-size: 13px; color: #b4432a; font-weight: 700; margin-left: 20px; }
+
+  .list-add { display: flex; gap: 8px; margin-bottom: 8px; }
+  .list-add input {
+    flex: 1; min-width: 0; border: 2px solid var(--line); background: #fff; border-radius: 12px;
+    padding: 10px 12px; font-size: 16px; font-weight: 600; outline: none;
+  }
+  .list-add input:focus { border-color: var(--ink); }
+  .btn {
+    border: 0; border-radius: 12px; padding: 10px 16px; font-weight: 800; font-size: 16px;
+    background: var(--ink); color: #fff;
+  }
+  .btn.ghost { background: var(--soft); color: var(--ink); }
+  .btn.danger { background: #fbe4dc; color: #a23a20; }
+  .li {
+    display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
+    border: 0; background: none; padding: 8px 2px; font-size: 17px; font-weight: 700;
+    border-bottom: 1px solid var(--line);
+  }
+  .li .bx { width: 24px; height: 24px; border-radius: 7px; border: 2.5px solid #cbbfb2; flex: none; display: grid; place-items: center; font-size: 15px; color: #fff; }
+  .li.done { color: var(--muted); text-decoration: line-through; }
+  .li.done .bx { background: #2a9d8f; border-color: #2a9d8f; }
+  .list-foot { display: flex; justify-content: flex-end; margin-top: 8px; }
+  .link-btn { border: 0; background: none; color: var(--muted); font-weight: 700; font-size: 14px; padding: 4px; }
+
+  /* ── Overlays ── */
+  .overlay { position: fixed; inset: 0; z-index: 50; }
+  #saver { background: #000; color: #fff; overflow: hidden; }
+  .slide { position: absolute; inset: 0; opacity: 0; transition: opacity 1.6s ease; }
+  .slide.show { opacity: 1; }
+  .slide .bg { position: absolute; inset: -40px; width: calc(100% + 80px); height: calc(100% + 80px); object-fit: cover; filter: blur(30px) brightness(.55); }
+  .slide .fg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+  .slide.show .fg { animation: drift 30s ease-out both; }
+  @keyframes drift { from { transform: scale(1); } to { transform: scale(1.05); } }
+  .saver-info {
+    position: absolute; left: 0; right: 0; bottom: 0; padding: 80px 40px max(32px, env(safe-area-inset-bottom));
+    background: linear-gradient(transparent, rgba(0,0,0,.6)); display: flex; align-items: flex-end; gap: 32px;
+    text-shadow: 0 2px 12px rgba(0,0,0,.45);
+  }
+  .saver-info .clock { font-size: 88px; }
+  .saver-info .date { font-size: 26px; }
+  .saver-next { margin-left: auto; text-align: right; font-size: 22px; font-weight: 800; max-width: 45%; }
+  .saver-next small { display: block; font-size: 14px; letter-spacing: .1em; text-transform: uppercase; opacity: .8; }
+  .saver-empty {
+    position: absolute; inset: 0;
+    background: radial-gradient(ellipse at 20% 10%, #3b2d5e, transparent 60%), radial-gradient(ellipse at 90% 90%, #5e2d3a, transparent 60%), #140f1f;
+  }
+
+  #night { background: #000; color: #5a5048; display: grid; place-items: center; }
+  #night .clock { font-size: 120px; font-weight: 700; }
+
+  #modal { background: rgba(30,22,16,.45); display: grid; place-items: center; padding: 16px; }
+  .sheet {
+    background: var(--card); border-radius: 24px; box-shadow: 0 20px 60px rgba(0,0,0,.25);
+    width: min(720px, 100%); max-height: calc(100dvh - 32px); overflow-y: auto; padding: 24px;
+  }
+  .sheet h2 { margin: 0 0 4px; font-size: 26px; }
+  .sheet h3 { margin: 22px 0 8px; font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+  .sheet .actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 22px; flex-wrap: wrap; }
+  .field { display: grid; gap: 4px; font-size: 13px; font-weight: 800; color: var(--muted); }
+  .field input, .field select {
+    border: 2px solid var(--line); border-radius: 10px; padding: 9px 10px; font-size: 15px;
+    font-weight: 600; background: #fff; color: var(--ink); width: 100%; min-width: 0;
+  }
+  .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+  .member { border: 2px solid var(--line); border-radius: 16px; padding: 14px; margin-bottom: 10px; display: grid; gap: 10px; }
+  .member-head { display: flex; gap: 10px; align-items: end; }
+  .member-head .field:first-child { flex: 1; }
+  .swatches { display: flex; gap: 6px; }
+  .swatches button { width: 32px; height: 32px; border-radius: 50%; border: 3px solid transparent; background: var(--c); }
+  .swatches button[aria-pressed="true"] { border-color: var(--ink); }
+  .member-foot { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .test-out { font-size: 13px; font-weight: 700; color: var(--muted); }
+  .check { display: flex; gap: 10px; align-items: center; font-weight: 700; font-size: 15px; }
+  .check input { width: 22px; height: 22px; }
+  .detail-row { font-size: 17px; font-weight: 600; margin: 8px 0; color: #4d443d; }
+
+  #toast {
+    position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%); z-index: 80;
+    background: var(--ink); color: #fff; padding: 12px 20px; border-radius: 14px; font-weight: 700;
+    box-shadow: var(--shadow);
+  }
+
+  /* ── Portrait tablets and phones: stack and scroll ── */
+  @media (max-width: 1099px) {
+    body { overflow: auto; }
+    .app { height: auto; min-height: 100dvh; }
+    .main { grid-template-columns: 1fr; }
+    .week { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+    .day { max-height: 420px; }
+    .side { overflow: visible; display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); align-items: start; }
+    .wx-days { display: none; }
+  }
+  @media (max-width: 640px) {
+    .top { flex-wrap: wrap; gap: 12px; padding-left: 16px; padding-right: 16px; }
+    .clock { font-size: 48px; }
+    .date { font-size: 18px; }
+    .wx { margin-left: 0; }
+    .tools { margin-left: auto; }
+    .main { padding-left: 16px; padding-right: 16px; }
+    .week { grid-template-columns: 1fr; }
+    .saver-info { flex-direction: column; align-items: flex-start; padding-left: 20px; padding-right: 20px; }
+    .saver-info .clock { font-size: 64px; }
+    .saver-next { margin-left: 0; text-align: left; max-width: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header class="top">
+    <div>
+      <div class="clock" id="clock">--:--</div>
+    </div>
+    <div>
+      <div class="date" id="date"></div>
+      <div class="status" id="status"></div>
+    </div>
+    <div class="wx" id="wx"></div>
+    <div class="tools">
+      <button class="icon-btn" id="btn-photos" title="Photo frame" aria-label="Photo frame">🖼️</button>
+      <a class="icon-btn" href="index.html" title="Morning routine" aria-label="Morning routine">☀️</a>
+      <button class="icon-btn" id="btn-settings" title="Settings" aria-label="Settings">⚙️</button>
+    </div>
+  </header>
+
+  <main class="main">
+    <section class="week" id="week" aria-label="This week"></section>
+    <aside class="side">
+      <section class="card" id="meals"></section>
+      <section class="card" id="mail"></section>
+      <section class="card" id="list"></section>
+    </aside>
+  </main>
+</div>
+
+<div class="overlay" id="saver" hidden>
+  <div class="saver-empty" id="saver-empty"></div>
+  <div class="slide"><img class="bg" alt=""><img class="fg" alt=""></div>
+  <div class="slide"><img class="bg" alt=""><img class="fg" alt=""></div>
+  <div class="saver-info">
+    <div>
+      <div class="clock" data-clock></div>
+      <div class="date" data-date></div>
+    </div>
+    <div class="saver-next" id="saver-next"></div>
+  </div>
+</div>
+
+<div class="overlay" id="night" hidden><div class="clock" data-clock></div></div>
+<div class="overlay" id="modal" hidden><div class="sheet" id="sheet"></div></div>
+<div id="toast" hidden></div>
+
+<script>
+(() => {
+  'use strict';
+
+  /* ── Storage ── */
+  const K_CFG = 'hub.cfg', K_DATA = 'hub.data', K_LOCAL_LIST = 'hub.list', K_GEO = 'hub.geo', K_WX = 'hub.wx', K_RELOAD = 'hub.reloaded';
+  const load = (k, fb) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : fb; } catch { return fb; } };
+  const save = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
+
+  const COLORS = ['#e76f51', '#2a9d8f', '#7c5cbf', '#e9a23b', '#3a86ff', '#d6457a'];
+  const DEFAULTS = { members: [], zip: '', idleMin: 10, photoSec: 20, nightFrom: 22, nightTo: 6, showSubjects: true, demo: false };
+  const REFRESH_MS = 5 * 60 * 1000, PHOTO_REFRESH_MS = 60 * 60 * 1000, NIGHT_IDLE_MS = 2 * 60 * 1000;
+
+  let cfg = { ...DEFAULTS, ...load(K_CFG, {}) };
+  let data = load(K_DATA, {});              // member id → { calendar, gmail, meals, list, photos, at, err }
+  let events = [];                          // merged events currently on screen, for the detail sheet
+
+  /* ── Helpers ── */
+  const $ = (s, r = document) => r.querySelector(s);
+  const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  const dayKey = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const parseDay = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
+  const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
+  const startOfDay = d => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; };
+  const fmtTime = d => d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+    .replace(':00', '').replace(/\s?([AP])M/i, (_, a) => a.toLowerCase());
+  const fmtClock = d => d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }).replace(/\s?[AP]M/i, '');
+  const fmtDate = d => d.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' });
+  const ago = t => {
+    const m = Math.round((Date.now() - t) / 60000);
+    if (m < 1) return 'just now';
+    if (m < 60) return `${m} min ago`;
+    const h = Math.round(m / 60);
+    return h < 24 ? `${h}h ago` : `${Math.round(h / 24)}d ago`;
+  };
+  function toast(msg) {
+    const t = $('#toast'); t.textContent = msg; t.hidden = false;
+    clearTimeout(toast.t); toast.t = setTimeout(() => { t.hidden = true; }, 3500);
+  }
+
+  /* ── Members & Apps Script calls ── */
+  const DEMO_MEMBERS = [{ id: 'demo-a', name: 'Dad', color: COLORS[1] }, { id: 'demo-b', name: 'Mom', color: COLORS[0] }];
+  const demoOn = () => cfg.demo && !cfg.members.length;
+  const members = () => demoOn() ? DEMO_MEMBERS : cfg.members;
+  const connected = () => cfg.members.filter(m => m.url && m.key);
+  const listHome = () => connected()[0] || null;
+
+  async function getScript(m, params) {
+    const u = new URL(m.url);
+    u.searchParams.set('key', m.key);
+    for (const [k, v] of Object.entries(params)) u.searchParams.set(k, v);
+    const r = await fetch(u, { cache: 'no-store' });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const j = await r.json();
+    if (j.error) throw new Error(j.error);
+    return j;
+  }
+  async function postScript(m, body) {
+    // text/plain keeps this a "simple" request, which Apps Script can answer without a CORS preflight.
+    const r = await fetch(m.url, { method: 'POST', body: JSON.stringify({ key: m.key, ...body }) });
+    const j = await r.json();
+    if (j.error) throw new Error(j.error);
+    return j;
+  }
+
+  async function refreshMember(m, parts) {
+    const d = data[m.id] || (data[m.id] = {});
+    try {
+      const j = await getScript(m, { parts: parts.join(',') });
+      for (const p of parts) if (p in j) d[p] = j[p];
+      const errs = Object.entries(j.errors || {});
+      d.err = errs.length ? errs.map(([k, v]) => `${k}: ${v}`).join('; ') : '';
+      d.at = Date.now();
+    } catch (e) {
+      d.err = String(e.message || e);
+    }
+  }
+  const inFlight = new Set();
+  async function refreshAll(parts = ['calendar', 'gmail', 'meals', 'list']) {
+    const tag = parts.join();
+    if (inFlight.has(tag)) return;
+    inFlight.add(tag);
+    try {
+      await Promise.all(connected().map(m => refreshMember(m, parts)));
+      save(K_DATA, data);
+    } finally {
+      inFlight.delete(tag);
+      render();
+    }
+  }
+
+  /* ── Demo data, so the screen can be tried before anything is connected ── */
+  function demoData() {
+    const t = startOfDay(new Date());
+    const at = (day, h, m = 0) => { const d = addDays(t, day); d.setHours(h, m); return d.toISOString(); };
+    const ev = (day, h, m, dur, title, location = '') => ({ id: title + day, title, allDay: false, start: at(day, h, m), end: new Date(new Date(at(day, h, m)).getTime() + dur * 60000).toISOString(), location, calendar: 'Family' });
+    const all = (day, len, title) => ({ id: title, title, allDay: true, start: dayKey(addDays(t, day)), end: dayKey(addDays(t, day + len)), location: '', calendar: 'Family' });
+    const shared = [ev(0, 17, 30, 60, 'Family dinner at Grandma’s', '12 Oak St'), all(4, 1, 'Paul’s birthday 🎂')];
+    const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const plan = ['Pancakes & fruit / Pot roast', 'Oatmeal / Tacos', 'Eggs & toast / Spaghetti and meatballs', 'Yogurt parfaits / Chicken stir-fry', 'Waffles / Sheet-pan salmon', 'Smoothies / Homemade pizza night', 'French toast / Burgers on the grill'];
+    return {
+      'demo-a': {
+        calendar: [...shared, ev(0, 7, 45, 15, 'School drop-off'), ev(0, 10, 0, 60, 'Team standup'), ev(1, 18, 0, 90, 'Soccer practice', 'Lincoln Park field 3'), ev(2, 12, 0, 60, 'Lunch with Mike'), ev(3, 16, 30, 60, 'Oil change'), ev(5, 9, 0, 120, 'Soccer game'), ev(6, 10, 0, 90, 'Church')],
+        gmail: { unread: 3, threads: [{ from: 'Amazon', subject: 'Your package was delivered' }, { from: 'Coach Dave', subject: 'Game moved to 9am Saturday' }, { from: 'City Water', subject: 'Your bill is ready' }] },
+        list: [{ id: 'a', text: 'Milk', done: false }, { id: 'b', text: 'Bananas', done: false }, { id: 'c', text: 'Birthday candles', done: false }, { id: 'd', text: 'Coffee filters', done: true }],
+        at: Date.now()
+      },
+      'demo-b': {
+        calendar: [...shared, ev(0, 15, 0, 30, 'Paul pickup'), ev(1, 9, 30, 60, 'Dentist — Paul', 'Bright Smiles Dental'), ev(2, 19, 0, 90, 'Book club'), all(3, 1, 'Early release day'), ev(4, 16, 0, 120, 'Birthday party setup'), ev(6, 13, 0, 60, 'Nap time 😴')],
+        gmail: { unread: 5, threads: [{ from: 'Lincoln Elementary', subject: 'Picture day is Friday' }, { from: 'Target', subject: 'Order ready for pickup' }, { from: 'Sarah', subject: 'Playdate this weekend?' }] },
+        meals: { text: 'Meals this week\n\n' + plan.map((p, i) => { const [b, dn] = p.split(' / '); return `${DAYS[i]}\nBreakfast: ${b}\nDinner: ${dn}`; }).join('\n\n'), at: new Date(Date.now() - 3 * 3600e3).toISOString() },
+        at: Date.now()
+      }
+    };
+  }
+  const demoPhotos = () => Array.from({ length: 12 }, (_, i) => `https://picsum.photos/seed/familyhub${i}/1600/1000`);
+  let demo = null;
+  const view = () => demoOn() ? (demo || (demo = demoData())) : data;
+
+  /* ── Calendar ── */
+  function mergedEvents() {
+    const byKey = new Map();
+    for (const m of members()) {
+      for (const e of (view()[m.id]?.calendar || [])) {
+        // A shared calendar shows up for both people; recurring events share an id, so key on start too.
+        const k = `${e.id}|${e.start}`;
+        const hit = byKey.get(k);
+        if (hit) { if (!hit.owners.includes(m)) hit.owners.push(m); }
+        else byKey.set(k, { ...e, owners: [m] });
+      }
+    }
+    return [...byKey.values()];
+  }
+  function eventsOn(day, all) {
+    const s = day.getTime(), e = addDays(day, 1).getTime(), key = dayKey(day);
+    const allDay = all.filter(ev => ev.allDay && ev.start <= key && key < ev.end);
+    const timed = all.filter(ev => !ev.allDay && new Date(ev.start).getTime() < e && new Date(ev.end).getTime() > s)
+      .sort((a, b) => new Date(a.start) - new Date(b.start));
+    return { allDay: allDay.sort((a, b) => a.title.localeCompare(b.title)), timed };
+  }
+  function nextEvent() {
+    const now = Date.now();
+    return mergedEvents().filter(e => !e.allDay && new Date(e.end).getTime() > now)
+      .sort((a, b) => new Date(a.start) - new Date(b.start))[0] || null;
+  }
+
+  function renderWeek() {
+    const week = $('#week');
+    if (!members().length) {
+      week.innerHTML = `
+        <div class="welcome">
+          <h2>Welcome to your Family Hub</h2>
+          <p>Calendars, tonight's dinner, both inboxes, a shared list, and a photo frame when nobody's using it.</p>
+          <ol>
+            <li>Each of you sets up the small Google script — steps in the README under <b>Family Hub</b>.</li>
+            <li>Paste each script's URL and key into Settings here.</li>
+            <li>Add the iPhone Shortcut so the meals note shows up.</li>
+          </ol>
+          <div class="row">
+            <button class="btn" data-act="settings">Open Settings</button>
+            <button class="btn ghost" data-act="demo">Try it with sample data</button>
+          </div>
+        </div>`;
+      return;
+    }
+    events = mergedEvents();
+    const today = startOfDay(new Date()), now = Date.now();
+    let html = '';
+    for (let i = 0; i < 7; i++) {
+      const day = addDays(today, i);
+      const { allDay, timed } = eventsOn(day, events);
+      const label = i === 0 ? 'Today' : i === 1 ? 'Tomorrow' : day.toLocaleDateString([], { weekday: 'long' });
+      const big = i < 2 ? day.toLocaleDateString([], { weekday: 'short', day: 'numeric' }) : day.toLocaleDateString([], { month: 'short', day: 'numeric' });
+      const chip = ev => {
+        const c = ev.owners[0].color;
+        const dots = ev.owners.length > 1 ? `<span class="dots">${ev.owners.map(o => `<i style="--d:${o.color}"></i>`).join('')}</span>` : '';
+        const idx = events.indexOf(ev);
+        if (ev.allDay) return `<button class="ev allday" style="--c:${c}" data-ev="${idx}"><div class="n">${esc(ev.title)}${dots}</div></button>`;
+        const s = new Date(ev.start), e = new Date(ev.end);
+        const state = e.getTime() <= now ? ' past' : s.getTime() <= now ? ' now' : '';
+        const time = s < day ? 'cont.' : fmtTime(s);
+        return `<button class="ev${state}" style="--c:${c}" data-ev="${idx}"><div class="t">${time}${dots}</div><div class="n">${esc(ev.title)}</div></button>`;
+      };
+      const body = allDay.length + timed.length ? allDay.map(chip).join('') + timed.map(chip).join('') : '<div class="empty-day">Nothing planned</div>';
+      html += `<div class="day${i === 0 ? ' today' : ''}"><h3>${label}<b>${esc(big)}</b></h3><div class="evs">${body}</div></div>`;
+    }
+    week.innerHTML = html;
+  }
+
+  function showEvent(ev) {
+    const when = ev.allDay
+      ? (() => { const s = parseDay(ev.start), e = addDays(parseDay(ev.end), -1); return dayKey(s) === dayKey(e) ? `${fmtDate(s)} · all day` : `${fmtDate(s)} – ${fmtDate(e)}`; })()
+      : `${fmtDate(new Date(ev.start))} · ${fmtTime(new Date(ev.start))} – ${fmtTime(new Date(ev.end))}`;
+    openSheet(`
+      <h2>${esc(ev.title)}</h2>
+      <div class="detail-row">🕒 ${esc(when)}</div>
+      ${ev.location ? `<div class="detail-row">📍 ${esc(ev.location)}</div>` : ''}
+      <div class="detail-row">🗓️ ${esc(ev.calendar)} — ${ev.owners.map(o => esc(o.name)).join(' & ')}</div>
+      <div class="actions"><button class="btn" data-act="close">Done</button></div>`);
+  }
+
+  /* ── Meals (Apple Note, sent by an iPhone Shortcut) ── */
+  const DAY_RE = /^(sunday|monday|tuesday|wednesday|thursday|friday|saturday|sun|mon|tues?|wed|thur?s?|fri|sat)(?![a-z])\.?/i;
+  const DAY_IDX = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 };
+
+  // Reads a weekly plan in whatever shape the note is in: "Monday" on its own line with meals
+  // under it, or "Mon – Tacos" on one line. Returns meals per weekday, or null if the note
+  // has no day names at all (then the whole note is shown).
+  function parseMeals(text) {
+    const byDay = {};
+    let cur = null, found = false;
+    for (const raw of String(text || '').split(/\r?\n/)) {
+      const line = raw.replace(/^[\s\-•*#◦▪︎]+/, '').trim();
+      if (!line) continue;
+      const m = line.match(DAY_RE);
+      if (m) {
+        cur = DAY_IDX[m[1].slice(0, 3).toLowerCase()];
+        found = true;
+        byDay[cur] = byDay[cur] || [];
+        const rest = line.slice(m[0].length).replace(/^[\s,]*(\d{1,2}\/\d{1,2}(\/\d{2,4})?)?[\s:–—\-.,)]*/, '').trim();
+        if (rest) byDay[cur].push(rest);
+      } else if (cur !== null) {
+        byDay[cur].push(line);
+      }
+    }
+    return found ? byDay : null;
+  }
+  function mealRow(item) {
+    const m = item.match(/^(breakfast|lunch|dinner|supper|snack|b|l|d)\s*[:\-–—]\s*(.+)$/i);
+    if (!m) return `<div class="meal"><span>${esc(item)}</span></div>`;
+    const lbl = { b: 'Breakfast', l: 'Lunch', d: 'Dinner' }[m[1].toLowerCase()] || m[1];
+    return `<div class="meal"><span class="lbl">${esc(lbl)}</span><span>${esc(m[2])}</span></div>`;
+  }
+  function renderMeals() {
+    const el = $('#meals');
+    const notes = members().map(m => view()[m.id]?.meals).filter(x => x && x.text);
+    notes.sort((a, b) => new Date(b.at) - new Date(a.at));
+    const note = notes[0];
+    if (!note) {
+      el.innerHTML = `<h2>🍽️ Meals</h2><div class="hint">Nothing yet. Once the iPhone Shortcut runs, the meals note shows up here — see the README.</div>`;
+      return;
+    }
+    const byDay = parseMeals(note.text);
+    const stamp = note.at ? `<span class="aside">updated ${ago(new Date(note.at).getTime())}</span>` : '';
+    if (!byDay) {
+      const lines = note.text.split(/\r?\n/).map(s => s.trim()).filter(Boolean).slice(0, 12);
+      el.innerHTML = `<h2>🍽️ Meals${stamp}</h2>${lines.map(mealRow).join('')}`;
+      return;
+    }
+    const d = new Date().getDay();
+    const today = byDay[d] || [], tmrw = byDay[(d + 1) % 7] || [];
+    el.innerHTML = `<h2>🍽️ Today's meals${stamp}</h2>
+      ${today.length ? today.map(mealRow).join('') : '<div class="hint">Nothing in the note for today.</div>'}
+      ${tmrw.length ? `<div class="meal-tmrw">Tomorrow: <b>${esc(tmrw.join(' · '))}</b></div>` : ''}`;
+  }
+
+  /* ── Email ── */
+  function renderMail() {
+    const el = $('#mail');
+    const ms = members();
+    if (!ms.length) { el.innerHTML = `<h2>✉️ Email</h2><div class="hint">Connect an account in Settings.</div>`; return; }
+    el.innerHTML = `<h2>✉️ Unread email</h2>` + ms.map(m => {
+      const d = view()[m.id] || {}, g = d.gmail;
+      const count = g ? (g.capped ? `${g.unread}+` : g.unread) : '–';
+      const head = `<div class="mail-who" style="--c:${m.color}"><span class="sw"></span>${esc(m.name)}<span class="badge${g && !g.unread ? ' zero' : ''}">${count}</span></div>`;
+      if (!g) return head + (d.err ? `<div class="mail-err">${esc(d.err)}</div>` : '');
+      if (!cfg.showSubjects || !g.threads.length) return head;
+      return head + `<div class="mail-list">${g.threads.slice(0, 3).map(t => `<div class="mail-item"><b>${esc(t.from)}</b> <span>${esc(t.subject)}</span></div>`).join('')}</div>`;
+    }).join('');
+  }
+
+  /* ── Family list ── */
+  function applyListOp(list, op) {
+    const now = Date.now();
+    list = list.map(i => ({ ...i }));
+    if (op.action === 'listAdd' && op.text && !list.some(i => i.id === op.id)) list.push({ id: op.id, text: op.text, done: false, at: now });
+    if (op.action === 'listToggle') list.forEach(i => { if (i.id === op.id) { i.done = !i.done; i.at = now; } });
+    if (op.action === 'listClearDone') list = list.filter(i => !i.done);
+    return list;
+  }
+  function currentList() {
+    if (demoOn()) return view()['demo-a'].list;
+    const home = listHome();
+    return home ? (data[home.id]?.list || []) : load(K_LOCAL_LIST, []);
+  }
+  async function listOp(op) {
+    if (demoOn()) { demo['demo-a'].list = applyListOp(demo['demo-a'].list, op); renderList(); return; }
+    const home = listHome();
+    if (!home) { save(K_LOCAL_LIST, applyListOp(load(K_LOCAL_LIST, []), op)); renderList(); return; }
+    const d = data[home.id] || (data[home.id] = {});
+    d.list = applyListOp(d.list || [], op);
+    renderList();
+    try {
+      const j = await postScript(home, op);
+      d.list = j.list; save(K_DATA, data); renderList();
+    } catch (e) {
+      toast(`Couldn't save the list (${e.message}). Check the connection.`);
+    }
+  }
+  function renderList() {
+    const el = $('#list');
+    const focused = document.activeElement?.id === 'list-input';
+    const draft = $('#list-input')?.value || '';
+    const items = currentList();
+    const open = items.filter(i => !i.done), done = items.filter(i => i.done);
+    const li = i => `<button class="li${i.done ? ' done' : ''}" data-li="${esc(i.id)}"><span class="bx">${i.done ? '✓' : ''}</span>${esc(i.text)}</button>`;
+    el.innerHTML = `<h2>🛒 Family list<span class="aside">${open.length} to get</span></h2>
+      <form class="list-add" id="list-form"><input id="list-input" placeholder="Add an item…" autocomplete="off" enterkeyhint="done"><button class="btn">Add</button></form>
+      ${open.map(li).join('')}${done.map(li).join('')}
+      ${done.length ? '<div class="list-foot"><button class="link-btn" data-act="clear-done">Clear checked</button></div>' : ''}`;
+    const input = $('#list-input');
+    input.value = draft;
+    if (focused) input.focus();
+  }
+
+  /* ── Weather (Open-Meteo, no key) ── */
+  const WX = c => c === 0 ? '☀️' : c <= 2 ? '🌤️' : c === 3 ? '☁️' : c <= 48 ? '🌫️' : c <= 57 ? '🌦️' : c <= 67 ? '🌧️' : c <= 77 ? '🌨️' : c <= 82 ? '🌧️' : c <= 86 ? '🌨️' : '⛈️';
+  async function getWeather() {
+    const zip = String(cfg.zip || '').trim();
+    if (!zip) return null;
+    const c = load(K_WX, null);
+    if (c && c.zip === zip && Date.now() - c.ts < 20 * 60 * 1000) return c;
+    let geo = load(K_GEO, null);
+    if (!geo || geo.zip !== zip) {
+      const r = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(zip)}&count=1&countryCode=US&language=en`);
+      const loc = (await r.json()).results?.[0];
+      if (!loc) throw new Error('ZIP not found');
+      geo = { zip, lat: loc.latitude, lon: loc.longitude };
+      save(K_GEO, geo);
+    }
+    const r = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${geo.lat}&longitude=${geo.lon}&current=temperature_2m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min&temperature_unit=fahrenheit&timezone=auto&forecast_days=5`);
+    const j = await r.json();
+    const out = { zip, ts: Date.now(), now: { t: Math.round(j.current.temperature_2m), c: j.current.weather_code },
+      days: j.daily.time.map((t, i) => ({ t, c: j.daily.weather_code[i], hi: Math.round(j.daily.temperature_2m_max[i]), lo: Math.round(j.daily.temperature_2m_min[i]) })) };
+    save(K_WX, out);
+    return out;
+  }
+  let wx = null;
+  async function refreshWeather() {
+    try { wx = await getWeather(); } catch { wx = load(K_WX, null); }
+    renderWeather();
+  }
+  function renderWeather() {
+    const el = $('#wx');
+    if (!wx || wx.zip !== String(cfg.zip || '').trim()) { el.innerHTML = ''; return; }
+    const [d0, ...rest] = wx.days;
+    el.innerHTML = `
+      <div class="wx-now"><span class="ic">${WX(wx.now.c)}</span><span class="tp">${wx.now.t}°</span>
+        <span class="hl">H ${d0.hi}°<br>L ${d0.lo}°</span></div>
+      <div class="wx-days">${rest.slice(0, 4).map(d => `<div class="wx-day">${parseDay(d.t).toLocaleDateString([], { weekday: 'short' })}<span class="ic">${WX(d.c)}</span><b>${d.hi}°</b> ${d.lo}°</div>`).join('')}</div>`;
+  }
+
+  /* ── Clock, status ── */
+  let lastDay = dayKey(new Date());
+  function tick() {
+    const now = new Date();
+    $('#clock').textContent = fmtClock(now);
+    $('#date').textContent = fmtDate(now);
+    $$('[data-clock]').forEach(e => { e.textContent = fmtClock(now); });
+    $$('[data-date]').forEach(e => { e.textContent = fmtDate(now); });
+    if (dayKey(now) !== lastDay) { lastDay = dayKey(now); render(); }
+    // A daily reload at 3am picks up any update to this page on a tablet that never closes it.
+    if (now.getHours() === 3 && localStorage.getItem(K_RELOAD) !== dayKey(now)) {
+      try { localStorage.setItem(K_RELOAD, dayKey(now)); } catch {}
+      location.reload();
+    }
+    idleCheck();
+  }
+  function renderStatus() {
+    const el = $('#status');
+    if (demoOn()) { el.textContent = 'Sample data — open Settings to connect your accounts'; el.className = 'status'; return; }
+    const errs = connected().filter(m => data[m.id]?.err).map(m => `${m.name}: ${data[m.id].err}`);
+    const ats = connected().map(m => data[m.id]?.at).filter(Boolean);
+    el.className = 'status' + (errs.length ? ' warn' : '');
+    el.textContent = errs.length ? `⚠ ${errs.join(' · ')}` : ats.length ? `Updated ${ago(Math.min(...ats))}` : '';
+  }
+
+  function render() {
+    renderWeek(); renderMeals(); renderMail(); renderList(); renderStatus(); renderSaverInfo();
+  }
+
+  /* ── Photo frame & night mode ── */
+  const photoUrls = () => demoOn() ? demoPhotos()
+    : connected().flatMap(m => (data[m.id]?.photos || []).map(id => `https://drive.google.com/thumbnail?id=${encodeURIComponent(id)}&sz=w1920`));
+  const saver = { on: false, timer: null, order: [], i: 0, layer: 0 };
+  let lastTouch = Date.now();
+
+  function nextPhoto() {
+    const urls = photoUrls();
+    $('#saver-empty').hidden = urls.length > 0;
+    if (!urls.length) return;
+    if (saver.i >= saver.order.length) {
+      saver.order = urls.slice().sort(() => Math.random() - .5);
+      saver.i = 0;
+    }
+    const url = saver.order[saver.i++];
+    const img = new Image();
+    img.onload = () => {
+      if (!saver.on) return;
+      const slides = $$('#saver .slide');
+      const next = slides[saver.layer ^ 1];
+      next.querySelector('.bg').src = url;
+      next.querySelector('.fg').src = url;
+      next.classList.add('show');
+      slides[saver.layer].classList.remove('show');
+      saver.layer ^= 1;
+    };
+    img.src = url;
+  }
+  function startSaver() {
+    if (saver.on) return;
+    saver.on = true;
+    $('#saver').hidden = false;
+    renderSaverInfo();
+    nextPhoto();
+    saver.timer = setInterval(nextPhoto, Math.max(5, +cfg.photoSec || 20) * 1000);
+  }
+  function stopSaver() {
+    saver.on = false;
+    clearInterval(saver.timer);
+    $('#saver').hidden = true;
+    $$('#saver .slide').forEach(s => s.classList.remove('show'));
+  }
+  function renderSaverInfo() {
+    const ev = nextEvent(), el = $('#saver-next');
+    if (!ev) { el.innerHTML = wx ? `${WX(wx.now.c)} ${wx.now.t}°` : ''; return; }
+    const s = new Date(ev.start), started = s.getTime() <= Date.now();
+    const when = started ? '' : dayKey(s) === dayKey(new Date()) ? fmtTime(s) : `${s.toLocaleDateString([], { weekday: 'short' })} ${fmtTime(s)}`;
+    el.innerHTML = `<small>${started ? 'Happening now' : 'Up next'}</small>${when ? esc(when) + ' · ' : ''}${esc(ev.title)}${wx ? `<br>${WX(wx.now.c)} ${wx.now.t}°` : ''}`;
+  }
+
+  function inNight(d = new Date()) {
+    const f = +cfg.nightFrom, t = +cfg.nightTo, h = d.getHours();
+    if (f === t) return false;
+    return f < t ? h >= f && h < t : h >= f || h < t;
+  }
+  function idleCheck() {
+    const idle = Date.now() - lastTouch;
+    const busy = !$('#modal').hidden;
+    if (idle > 60000) document.activeElement?.blur?.();
+    const night = inNight() && idle > NIGHT_IDLE_MS && !busy;
+    $('#night').hidden = !night;
+    if (night) { if (saver.on) stopSaver(); return; }
+    if (!saver.on && +cfg.idleMin > 0 && idle > cfg.idleMin * 60000 && !busy) startSaver();
+  }
+  function wake() {
+    lastTouch = Date.now();
+    keepAwake();
+    if (saver.on) { stopSaver(); return true; }
+    if (!$('#night').hidden) { $('#night').hidden = true; return true; }
+    return false;
+  }
+
+  // Keeps the tablet's screen from sleeping while the hub is open.
+  let wakeLock = null;
+  async function keepAwake() {
+    try {
+      if ('wakeLock' in navigator && !wakeLock && document.visibilityState === 'visible') {
+        wakeLock = await navigator.wakeLock.request('screen');
+        wakeLock.addEventListener('release', () => { wakeLock = null; });
+      }
+    } catch {}
+  }
+
+  /* ── Sheets: settings, event details ── */
+  function openSheet(html) { $('#sheet').innerHTML = html; $('#modal').hidden = false; }
+  function closeSheet() { $('#modal').hidden = true; $('#sheet').innerHTML = ''; }
+
+  let draft = null;
+  function openSettings() {
+    draft = JSON.parse(JSON.stringify(cfg));
+    renderSettings();
+  }
+  function renderSettings() {
+    const hours = sel => Array.from({ length: 24 }, (_, h) => `<option value="${h}"${+sel === h ? ' selected' : ''}>${new Date(2000, 0, 1, h).toLocaleTimeString([], { hour: 'numeric' })}</option>`).join('');
+    const member = (m, i) => `
+      <div class="member" data-i="${i}">
+        <div class="member-head">
+          <label class="field">Name<input data-f="name" value="${esc(m.name)}" placeholder="e.g. Mom"></label>
+          <div class="swatches">${COLORS.map(c => `<button type="button" style="--c:${c}" data-color="${c}" aria-pressed="${m.color === c}" aria-label="Color"></button>`).join('')}</div>
+        </div>
+        <label class="field">Script URL (ends in /exec)<input data-f="url" value="${esc(m.url)}" placeholder="https://script.google.com/macros/s/…/exec" inputmode="url"></label>
+        <label class="field">Key<input data-f="key" value="${esc(m.key)}" placeholder="from the script's setup log"></label>
+        <div class="member-foot">
+          <button type="button" class="btn ghost" data-act="test">Test connection</button>
+          <span class="test-out"></span>
+          <button type="button" class="link-btn" data-act="remove" style="margin-left:auto">Remove</button>
+        </div>
+      </div>`;
+    openSheet(`
+      <h2>Settings</h2>
+      <div class="hint">Each person adds their own Google script so their calendar and email show here. The first person's script also holds the family list.</div>
+      <h3>People</h3>
+      ${draft.members.map(member).join('')}
+      <button type="button" class="btn ghost" data-act="add-member">+ Add a person</button>
+      <h3>Display</h3>
+      <div class="grid2">
+        <label class="field">ZIP code (weather)<input id="s-zip" value="${esc(draft.zip)}" inputmode="numeric" maxlength="10"></label>
+        <label class="field">Photo frame after (minutes, 0 = never)<input id="s-idle" type="number" min="0" max="240" value="${esc(draft.idleMin)}"></label>
+        <label class="field">Seconds per photo<input id="s-psec" type="number" min="5" max="600" value="${esc(draft.photoSec)}"></label>
+        <label class="field">Screen goes dark at<select id="s-nf">${hours(draft.nightFrom)}</select></label>
+        <label class="field">…and wakes at<select id="s-nt">${hours(draft.nightTo)}</select></label>
+      </div>
+      <p><label class="check"><input type="checkbox" id="s-subj"${draft.showSubjects ? ' checked' : ''}> Show email senders and subjects (off = unread counts only)</label></p>
+      <h3>Set up another screen</h3>
+      <div class="hint">Copies a link with these settings, keys included — open it on the tablet instead of typing everything again. Only send it to each other.</div>
+      <div class="actions" style="justify-content:flex-start"><button type="button" class="btn ghost" data-act="copy-setup">Copy setup link</button></div>
+      <div class="actions">
+        <button type="button" class="btn ghost" data-act="fullscreen">Full screen</button>
+        <button type="button" class="btn ghost" data-act="close">Cancel</button>
+        <button type="button" class="btn" data-act="save">Save</button>
+      </div>`);
+  }
+  function readSettingsForm() {
+    $$('#sheet .member').forEach(el => {
+      const m = draft.members[+el.dataset.i];
+      $$('[data-f]', el).forEach(inp => { m[inp.dataset.f] = inp.value.trim(); });
+    });
+    draft.zip = $('#s-zip').value.trim();
+    draft.idleMin = Math.max(0, +$('#s-idle').value || 0);
+    draft.photoSec = Math.max(5, +$('#s-psec').value || 20);
+    draft.nightFrom = +$('#s-nf').value;
+    draft.nightTo = +$('#s-nt').value;
+    draft.showSubjects = $('#s-subj').checked;
+  }
+  function applyCfg(next) {
+    cfg = { ...DEFAULTS, ...next };
+    save(K_CFG, cfg);
+    const ids = new Set(cfg.members.map(m => m.id));
+    for (const id of Object.keys(data)) if (!ids.has(id)) delete data[id];
+    save(K_DATA, data);
+    render();
+    refreshAll();
+    refreshAll(['photos']);
+    refreshWeather();
+  }
+  const b64 = s => btoa(unescape(encodeURIComponent(s))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  const unb64 = s => decodeURIComponent(escape(atob(s.replace(/-/g, '+').replace(/_/g, '/'))));
+  function importFromHash() {
+    const m = location.hash.match(/^#setup=([\w-]+)/);
+    if (!m) return;
+    history.replaceState(null, '', location.pathname + location.search);
+    try {
+      const next = JSON.parse(unb64(m[1]));
+      if (confirm(`Load settings for ${next.members.map(x => x.name).join(' & ') || 'this hub'}? This replaces what's on this screen.`)) applyCfg(next);
+    } catch { toast('That setup link is damaged.'); }
+  }
+
+  /* ── Events ── */
+  document.addEventListener('pointerdown', e => {
+    if (wake()) { e.preventDefault(); e.stopPropagation(); }
+  }, true);
+  document.addEventListener('keydown', () => { lastTouch = Date.now(); });
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') { keepAwake(); refreshAll(); }
+  });
+
+  document.addEventListener('click', async e => {
+    const t = e.target;
+    if (t.id === 'modal') { closeSheet(); return; }
+    const ev = t.closest('[data-ev]');
+    if (ev) { showEvent(events[+ev.dataset.ev]); return; }
+    const li = t.closest('[data-li]');
+    if (li) { listOp({ action: 'listToggle', id: li.dataset.li }); return; }
+    const sw = t.closest('[data-color]');
+    if (sw) {
+      readSettingsForm();
+      draft.members[+sw.closest('.member').dataset.i].color = sw.dataset.color;
+      renderSettings();
+      return;
+    }
+    const act = t.closest('[data-act]')?.dataset.act;
+    if (!act) return;
+    if (act === 'settings') openSettings();
+    if (act === 'close') closeSheet();
+    if (act === 'demo') { cfg.demo = true; save(K_CFG, cfg); render(); }
+    if (act === 'clear-done') listOp({ action: 'listClearDone' });
+    if (act === 'fullscreen') { closeSheet(); document.documentElement.requestFullscreen?.().catch(() => {}); }
+    if (act === 'add-member') {
+      readSettingsForm();
+      const used = draft.members.map(m => m.color);
+      draft.members.push({ id: uid(), name: '', color: COLORS.find(c => !used.includes(c)) || COLORS[0], url: '', key: '' });
+      renderSettings();
+    }
+    if (act === 'remove') {
+      readSettingsForm();
+      draft.members.splice(+t.closest('.member').dataset.i, 1);
+      renderSettings();
+    }
+    if (act === 'test') {
+      readSettingsForm();
+      const box = t.closest('.member'), out = $('.test-out', box), m = draft.members[+box.dataset.i];
+      if (!/^https:\/\/script\.google\.com\/.+\/exec$/.test(m.url || '')) { out.textContent = 'The URL should start with https://script.google.com and end in /exec'; return; }
+      out.textContent = 'Checking…';
+      try {
+        const j = await getScript(m, { parts: 'calendar,gmail,meals,photos' });
+        const errs = Object.keys(j.errors || {});
+        out.textContent = `✓ ${j.calendar?.length ?? 0} events, ${j.gmail?.unread ?? 0} unread, ${j.photos?.length ?? 0} photos` +
+          (j.meals?.text ? ', meals note' : '') + (errs.length ? ` — problem with ${errs.join(', ')}` : '');
+      } catch (err) {
+        out.textContent = `✗ ${err.message === 'bad key' ? 'Wrong key' : 'Couldn’t reach it — check the URL and that access is set to "Anyone"'}`;
+      }
+    }
+    if (act === 'save') {
+      readSettingsForm();
+      draft.members = draft.members.filter(m => m.name || m.url);
+      draft.members.forEach(m => { if (!m.name) m.name = 'Someone'; });
+      draft.demo = false;
+      closeSheet();
+      applyCfg(draft);
+    }
+    if (act === 'copy-setup') {
+      readSettingsForm();
+      const link = `${location.origin}${location.pathname}#setup=${b64(JSON.stringify({ ...draft, demo: false }))}`;
+      try { await navigator.clipboard.writeText(link); toast('Setup link copied'); }
+      catch { prompt('Copy this link:', link); }
+    }
+  });
+
+  document.addEventListener('submit', e => {
+    if (e.target.id !== 'list-form') return;
+    e.preventDefault();
+    const input = $('#list-input'), text = input.value.trim();
+    if (!text) return;
+    input.value = '';
+    listOp({ action: 'listAdd', id: uid(), text });
+  });
+
+  $('#btn-settings').addEventListener('click', openSettings);
+  $('#btn-photos').addEventListener('click', () => { lastTouch = Date.now(); startSaver(); });
+
+  /* ── Start ── */
+  render();
+  tick();
+  importFromHash();
+  refreshAll();
+  refreshAll(['photos']);
+  refreshWeather();
+  keepAwake();
+  setInterval(tick, 5000);
+  setInterval(() => refreshAll(), REFRESH_MS);
+  setInterval(() => refreshAll(['photos']), PHOTO_REFRESH_MS);
+  setInterval(refreshWeather, 20 * 60 * 1000);
+  setInterval(renderStatus, 60 * 1000);
+})();
+</script>
+</body>
+</html>
