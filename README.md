@@ -6,7 +6,7 @@ Single-file pages, no build step, no app store. Open one and add it to the home 
 | --- | --- | --- |
 | `index.html` | Paul | The morning routine: timed steps, voice prompts, ball jar. |
 | `tracker.html` | Mom and Dad | Behavior data: non-compliance, toileting accidents, tantrums. |
-| `hub.html` | The whole family | A Skylight-style wall display: week calendar, today's meals, both inboxes, a shared list, and a photo frame. |
+| `hub.html` | The whole family | A Skylight-style wall display: week calendar with school dates from APS email, today's meals, a shared list, and a photo frame. |
 
 ## tracker.html
 
@@ -65,17 +65,17 @@ overwrite the other's records.
 
 A kitchen display for an Android tablet. Across the top: clock, date, and weather. Below:
 the next seven days from both Google Calendars (color-coded per person, with shared events
-marked for both). Down the side: today's meals from the Apple Note, unread counts (and
-optionally senders and subjects) from both Gmail inboxes, and a family shopping/to-do
-list anyone can add to. After ten idle minutes it turns into a photo frame showing the
+marked for both), including dates pulled automatically from APS emails. Down the side:
+today's meals from the Apple Note and a family shopping/to-do list anyone can add to.
+The hub never shows email itself. After ten idle minutes it turns into a photo frame showing the
 clock and the next event. Overnight it goes dark. A tap wakes it every time.
 
 Tap **Try it with sample data** on the first screen to see it before connecting anything.
 
 ### 1. The Google script (each of you, ~5 minutes)
 
-Google won't let a web page read Gmail without an app of your own, so each of you runs
-`hub-script.gs` as a small private web app under your own account. Nobody shares a
+Google won't let a web page read your calendar without an app of your own, so each of you
+runs `hub-script.gs` as a small private web app under your own account. Nobody shares a
 password, and it's free.
 
 1. Go to [script.google.com](https://script.google.com) → **New project**. Delete what's
@@ -96,8 +96,37 @@ If you edit the script later, go to **Deploy → Manage deployments → ✏️ �
 version**. The URL stays the same.
 
 Only calendars that are checked in your Google Calendar sidebar show up. To pick specific
-ones, list their IDs in `CALENDAR_IDS`. The inbox shows unread mail in **Primary**. To
-change that, edit `EMAIL_QUERY` (it's a normal Gmail search, e.g. `is:unread is:important`).
+ones, list their IDs in `CALENDAR_IDS`.
+
+### 1b. APS emails → both calendars (one of you, ~5 minutes)
+
+Every hour, the script reads new mail from `@aps.edu` (the district and teachers). Claude
+reads each email, including attached PDF newsletters and flyers, and pulls out anything
+with a date a parent needs: no-school days, early releases, picture day, conferences,
+field trips, form and payment deadlines. It understands relative dates like "this Sunday".
+Each date becomes an event on a new **APS (from email)** calendar, with a 🏫 in front of the
+title and the original email's subject in the description. The other parent is added as a
+guest, so the event also appears on their calendar. No invite email is sent.
+
+Do this in **one** script only: the one whose Gmail gets APS mail (if you both get it, pick
+either). In that copy of `hub-script.gs`:
+
+1. Set `SCHOOL_IMPORT = true`, and put the other parent's Gmail address in `SHARE_WITH`,
+   e.g. `const SHARE_WITH = ['name@gmail.com'];`.
+2. Get an API key at [console.anthropic.com](https://console.anthropic.com) (add a few
+   dollars of credit; a school email costs about a cent or two to read). In the script
+   editor, open **Project Settings → Script Properties → Add**, name it
+   `ANTHROPIC_API_KEY`, and paste the key. Keeping it there means it's never in the code.
+3. Run **setup** again and allow the new permissions. This creates the calendar and the
+   hourly schedule. Then run **importSchoolEmails** once to catch up on the last three weeks.
+4. **Deploy → Manage deployments → ✏️ → New version** so the hub sees the change.
+
+Emails are read only once, dates that have already passed are skipped, and an event that's
+already on the calendar isn't added again, even when a later reminder email repeats it. To
+remove everything it has added, delete the **APS (from email)** calendar; the guest copies go
+with it. If something breaks (a used-up API key, for example), the hub's status line
+shows it, and Google emails you the failed run. To watch a different school or sender,
+change `SCHOOL_DOMAIN`.
 
 ### 2. The meals note (your wife's iPhone, ~3 minutes)
 
@@ -142,7 +171,7 @@ you both do, both folders show up. New photos appear within the hour.
   one-time license) and set the hub URL as its start page.
 
 Night mode (10pm–6am by default), how long before the photo frame starts, seconds per
-photo, the weather ZIP, and whether email subjects show are all in Settings.
+photo, and the weather ZIP are all in Settings.
 
 The family list lives in the first person's script, so it's the same on every screen that
 uses that script. Checked items clear after two days or with **Clear checked**.
