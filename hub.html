@@ -235,6 +235,7 @@
     </div>
     <div class="wx" id="wx"></div>
     <div class="tools">
+      <button class="icon-btn" id="btn-snap" title="Add to calendar from a photo" aria-label="Add to calendar from a photo">📷</button>
       <button class="icon-btn" id="btn-photos" title="Photo frame" aria-label="Photo frame">🖼️</button>
       <a class="icon-btn" href="index.html" title="Morning routine" aria-label="Morning routine">☀️</a>
       <button class="icon-btn" id="btn-settings" title="Settings" aria-label="Settings">⚙️</button>
@@ -266,6 +267,7 @@
 <div class="overlay" id="night" hidden><div class="clock" data-clock></div></div>
 <div class="overlay" id="modal" hidden><div class="sheet" id="sheet"></div></div>
 <div id="toast" hidden></div>
+<input type="file" id="snap-file" accept="image/*" hidden>
 
 <script>
 (() => {
@@ -281,7 +283,7 @@
   const REFRESH_MS = 5 * 60 * 1000, PHOTO_REFRESH_MS = 60 * 60 * 1000, NIGHT_IDLE_MS = 2 * 60 * 1000;
 
   let cfg = { ...DEFAULTS, ...load(K_CFG, {}) };
-  let data = load(K_DATA, {});              // member id → { calendar, meals, list, photos, school, at, err }
+  let data = load(K_DATA, {});              // member id → { calendar, meals, list, photos, at, err }
   let events = [];                          // merged events currently on screen, for the detail sheet
 
   /* ── Helpers ── */
@@ -347,7 +349,7 @@
     }
   }
   const inFlight = new Set();
-  async function refreshAll(parts = ['calendar', 'meals', 'list', 'school']) {
+  async function refreshAll(parts = ['calendar', 'meals', 'list']) {
     const tag = parts.join();
     if (inFlight.has(tag)) return;
     inFlight.add(tag);
@@ -625,8 +627,6 @@
     const el = $('#status');
     if (demoOn()) { el.textContent = 'Sample data — open Settings to connect your accounts'; el.className = 'status'; return; }
     const errs = connected().filter(m => data[m.id]?.err).map(m => `${m.name}: ${data[m.id].err}`);
-    // The school importer runs on its own hourly schedule; surface it here if it's failing.
-    connected().forEach(m => { const sc = data[m.id]?.school; if (sc?.enabled && sc.error) errs.push(`School email: ${sc.error}`); });
     const ats = connected().map(m => data[m.id]?.at).filter(Boolean);
     el.className = 'status' + (errs.length ? ' warn' : '');
     el.textContent = errs.length ? `⚠ ${errs.join(' · ')}` : ats.length ? `Updated ${ago(Math.min(...ats))}` : '';
@@ -718,6 +718,62 @@
       }
     } catch {}
   }
+
+  /* ── Snap a flyer: photo → Drive inbox → the scheduled Claude task adds its dates ── */
+  let snap = null;
+  // Shrinks the photo to a JPEG around 2000px on the long side, small enough to post to the
+  // script and still sharp enough to read a flyer.
+  function shrinkPhoto(file) {
+    return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(file), img = new Image();
+      img.onload = () => {
+        const k = Math.min(1, 2000 / Math.max(img.naturalWidth, img.naturalHeight));
+        const c = document.createElement('canvas');
+        c.width = Math.round(img.naturalWidth * k);
+        c.height = Math.round(img.naturalHeight * k);
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        URL.revokeObjectURL(url);
+        resolve(c.toDataURL('image/jpeg', 0.85));
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Couldn’t open that picture')); };
+      img.src = url;
+    });
+  }
+  function openSnap() {
+    if (demoOn() || !listHome()) { toast('Connect your Google script in Settings first.'); return; }
+    $('#snap-file').value = '';
+    $('#snap-file').click();
+  }
+  function renderSnap() {
+    openSheet(`
+      <h2>Add to the calendar</h2>
+      <div class="hint">Claude reads this at the next check (morning or evening), adds every date it finds to the calendar, and invites both of you.</div>
+      <img src="${snap}" alt="" style="display:block;max-width:100%;max-height:45dvh;margin:14px auto;border-radius:14px">
+      <label class="field">Anything Claude should know? (optional)<input id="snap-note" placeholder="e.g. Paul's class only, skip the fundraiser" maxlength="120"></label>
+      <div class="actions">
+        <button type="button" class="btn ghost" data-act="snap-again">Retake</button>
+        <button type="button" class="btn ghost" data-act="close">Cancel</button>
+        <button type="button" class="btn" data-act="snap-send">Send</button>
+      </div>`);
+  }
+  async function sendSnap(btn) {
+    btn.disabled = true;
+    btn.textContent = 'Sending…';
+    try {
+      await postScript(listHome(), { action: 'upload', data: snap.split(',')[1], note: $('#snap-note').value.trim() });
+      closeSheet();
+      toast('Sent — it’ll be on the calendar after the next check.');
+    } catch (e) {
+      btn.disabled = false;
+      btn.textContent = 'Send';
+      toast(`Couldn’t send it (${e.message}). Try again.`);
+    }
+  }
+  $('#snap-file').addEventListener('change', async e => {
+    const f = e.target.files[0];
+    if (!f) return;
+    try { snap = await shrinkPhoto(f); renderSnap(); } catch (err) { toast(err.message); }
+  });
 
   /* ── Sheets: settings, event details ── */
   function openSheet(html) { $('#sheet').innerHTML = html; $('#modal').hidden = false; }
@@ -828,6 +884,8 @@
     if (!act) return;
     if (act === 'settings') openSettings();
     if (act === 'close') closeSheet();
+    if (act === 'snap-again') { closeSheet(); openSnap(); }
+    if (act === 'snap-send') sendSnap(t.closest('button'));
     if (act === 'demo') { cfg.demo = true; save(K_CFG, cfg); render(); }
     if (act === 'clear-done') listOp({ action: 'listClearDone' });
     if (act === 'fullscreen') { closeSheet(); document.documentElement.requestFullscreen?.().catch(() => {}); }
@@ -848,12 +906,10 @@
       if (!/^https:\/\/script\.google\.com\/.+\/exec$/.test(m.url || '')) { out.textContent = 'The URL should start with https://script.google.com and end in /exec'; return; }
       out.textContent = 'Checking…';
       try {
-        const j = await getScript(m, { parts: 'calendar,meals,photos,school' });
+        const j = await getScript(m, { parts: 'calendar,meals,photos' });
         const errs = Object.keys(j.errors || {});
-        const sc = j.school || {};
-        const school = !sc.enabled ? '' : sc.error ? `, school import: ${sc.error}` : sc.at ? `, ${sc.total || 0} school dates imported` : ', school import not run yet';
         out.textContent = `✓ ${j.calendar?.length ?? 0} events, ${j.photos?.length ?? 0} photos` +
-          (j.meals?.text ? ', meals note' : '') + school + (errs.length ? ` — problem with ${errs.join(', ')}` : '');
+          (j.meals?.text ? ', meals note' : '') + (errs.length ? ` — problem with ${errs.join(', ')}` : '');
       } catch (err) {
         out.textContent = `✗ ${err.message === 'bad key' ? 'Wrong key' : 'Couldn’t reach it — check the URL and that access is set to "Anyone"'}`;
       }
@@ -884,6 +940,7 @@
   });
 
   $('#btn-settings').addEventListener('click', openSettings);
+  $('#btn-snap').addEventListener('click', openSnap);
   $('#btn-photos').addEventListener('click', () => { lastTouch = Date.now(); startSaver(); });
 
   /* ── Start ── */

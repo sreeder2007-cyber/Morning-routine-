@@ -98,37 +98,34 @@ version**. The URL stays the same.
 Only calendars that are checked in your Google Calendar sidebar show up. To pick specific
 ones, list their IDs in `CALENDAR_IDS`.
 
-### 1b. APS emails → both calendars (one of you, ~5 minutes)
+### 1b. School dates from APS email and photos (automatic)
 
-Every hour, the script reads new mail from `@aps.edu` (the district and teachers). Claude
-reads each email, including attached PDF newsletters and flyers, and pulls out anything
-with a date a parent needs: no-school days, early releases, picture day, conferences,
-field trips, form and payment deadlines. It understands relative dates like "this Sunday".
-Each date becomes an event on a new **APS (from email)** calendar, with a 🏫 in front of the
-title and the original email's subject in the description. The other parent is added as a
-guest, so the event also appears on their calendar. No invite email is sent.
+A scheduled Claude task runs twice a day, at 6:47am and 5:47pm Albuquerque time, on Scott's
+Claude plan, so no API key or extra billing is needed. It uses the Gmail, Google Calendar
+and Google Drive connections on that Claude account. Each run:
 
-Do this in **one** script only: the one whose Gmail gets APS mail (if you both get it, pick
-either). In that copy of `hub-script.gs`:
+- reads new mail from `@aps.edu` (the district and teachers), including newsletters;
+- reads new photos in the **Family Hub Inbox** folder in Scott's Google Drive;
+- adds every date a parent needs (no-school days, early releases, picture day,
+  conferences, field trips, form and payment deadlines) to Scott's calendar, with a 🏫 in
+  front of school items, and invites Carolyn so it's on her calendar too. No invite email
+  is sent.
 
-1. Set `SCHOOL_IMPORT = true`, and put the other parent's Gmail address in `SHARE_WITH`,
-   e.g. `const SHARE_WITH = ['name@gmail.com'];`.
-2. Get an API key at [console.anthropic.com](https://console.anthropic.com) (add a few
-   dollars of credit; a plain school email costs a cent or two to read, a long PDF
-   newsletter closer to 15–20¢). In the script
-   editor, open **Project Settings → Script Properties → Add**, name it
-   `ANTHROPIC_API_KEY`, and paste the key. Keeping it there means it's never in the code.
-3. Run **setup** again and allow the new permissions. This creates the calendar and the
-   hourly schedule. Then run **importSchoolEmails** once to catch up on the last three weeks.
-4. **Deploy → Manage deployments → ✏️ → New version** so the hub sees the change.
+It works out relative dates ("this Sunday") from when the email was sent or the photo was
+taken. Before adding anything it checks the calendar, so reminder emails don't create
+duplicates. Handled emails get the Gmail label **Family Hub/Added**, and handled photos move
+to **Family Hub Inbox/Done**. Anything that fails is retried at the next run. The task
+never replies to, deletes or forwards anything.
 
-Emails are read only once, dates that have already passed are skipped, and an event that's
-already on the calendar isn't added again, even when a later reminder email repeats it. To
-remove everything it has added, delete the **APS (from email)** calendar; the guest copies go
-with it. If something breaks (a used-up API key, for example), the hub's status line
-shows it, and Google emails you the failed run. To watch a different school or sender,
-change `SCHOOL_DOMAIN`.
+You can see, edit, pause or run it now from **Routines** in Claude (claude.ai/code).
 
+**Adding a date from a photo:** tap **📷** on the hub, take a picture of the flyer, calendar
+or schedule (or pick one from the tablet's gallery), and add an optional note like "Paul's
+class only". It's saved to the inbox folder and shows up on the calendar after the next
+run. From a phone, you can also drop a JPG, PNG or PDF straight into the **Family Hub Inbox**
+folder in Google Drive. iPhone HEIC photos don't work there, so use the hub or a screenshot.
+The 📷 button saves to the first person's script, so Scott should be first in Settings. The
+script creates the folder when you run **setup**.
 ### 2. The meals note (your wife's iPhone, ~3 minutes)
 
 Apple Notes has no way for other apps to read it, so an iPhone Shortcut sends the note
