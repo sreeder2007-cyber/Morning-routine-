@@ -1,0 +1,15 @@
+{
+  "name": "Family Hub",
+  "short_name": "Family Hub",
+  "description": "Family calendar, meals, email, shared list, and photo frame.",
+  "start_url": "hub.html",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#f4efe8",
+  "theme_color": "#f4efe8",
+  "icons": [
+    { "src": "hub-icon.svg", "sizes": "any", "type": "image/svg+xml" },
+    { "src": "hub-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}
