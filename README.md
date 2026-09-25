@@ -114,7 +114,8 @@ either). In that copy of `hub-script.gs`:
 1. Set `SCHOOL_IMPORT = true`, and put the other parent's Gmail address in `SHARE_WITH`,
    e.g. `const SHARE_WITH = ['name@gmail.com'];`.
 2. Get an API key at [console.anthropic.com](https://console.anthropic.com) (add a few
-   dollars of credit; a school email costs about a cent or two to read). In the script
+   dollars of credit; a plain school email costs a cent or two to read, a long PDF
+   newsletter closer to 15–20¢). In the script
    editor, open **Project Settings → Script Properties → Add**, name it
    `ANTHROPIC_API_KEY`, and paste the key. Keeping it there means it's never in the code.
 3. Run **setup** again and allow the new permissions. This creates the calendar and the
