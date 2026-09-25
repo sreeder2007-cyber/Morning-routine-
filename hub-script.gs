@@ -1,7 +1,7 @@
 /**
  * Family Hub — Google Apps Script backend.
  *
- * Each person who wants their calendar and email on the hub makes their own copy of this
+ * Each person who wants their calendar on the hub makes their own copy of this
  * script (script.google.com → New project → paste this file). It runs as that person, so
  * nobody shares a password and nothing is stored anywhere but their own Google account.
  *
@@ -13,6 +13,10 @@
  *
  * "Anyone" only means the URL answers without a Google sign-in; every request must carry
  * the key, and a request without it gets nothing back.
+ *
+ * School email → calendar: in ONE of your scripts, turn on SCHOOL_IMPORT. Every hour it
+ * reads new mail from the school, has Claude pull out anything with a date, and adds those
+ * to a "School" calendar, inviting the other parent so it lands on both calendars.
  */
 
 // Optional: the ID of a Google Drive folder of family photos (the part of the folder's URL
@@ -26,10 +30,23 @@ const PHOTO_FOLDER_ID = '';
 const CALENDAR_IDS = [];
 
 const DAYS_AHEAD = 7;
-const EMAIL_QUERY = 'in:inbox is:unread category:primary';
-const EMAIL_SHOWN = 5;
-const EMAIL_COUNT_CAP = 50;
 const LIST_MAX = 150;
+
+// ── School email import ──
+// Turn this on in one parent's script only; if both did, every event would be added twice.
+const SCHOOL_IMPORT = false;
+// Mail from this domain is read (teachers and the district both send from it).
+const SCHOOL_DOMAIN = 'aps.edu';
+// The calendar events go on. The script creates it the first time.
+const SCHOOL_CALENDAR = 'APS (from email)';
+// The other parent's Gmail address(es). They're added as guests on each event so it shows on
+// their calendar too. No invite email is sent.
+const SHARE_WITH = [];
+// Put in front of every imported title so they're easy to spot.
+const SCHOOL_PREFIX = '🏫 ';
+// Your Anthropic API key goes in Project Settings → Script Properties as ANTHROPIC_API_KEY,
+// not here, so it never ends up in a copy of this file.
+const CLAUDE_MODEL = 'claude-opus-5';
 
 const PROPS = PropertiesService.getScriptProperties();
 
@@ -41,16 +58,25 @@ function setup() {
     PROPS.setProperty('HUB_KEY', key);
   }
   CalendarApp.getDefaultCalendar();
-  GmailApp.getInboxUnreadCount();
   if (PHOTO_FOLDER_ID) DriveApp.getFolderById(PHOTO_FOLDER_ID).getName();
+  if (SCHOOL_IMPORT) {
+    GmailApp.search('from:' + SCHOOL_DOMAIN, 0, 1);
+    schoolCalendar_();
+    ScriptApp.getProjectTriggers()
+      .filter(function (t) { return t.getHandlerFunction() === 'importSchoolEmails'; })
+      .forEach(function (t) { ScriptApp.deleteTrigger(t); });
+    ScriptApp.newTrigger('importSchoolEmails').timeBased().everyHours(1).create();
+    if (!PROPS.getProperty('ANTHROPIC_API_KEY')) Logger.log('Add ANTHROPIC_API_KEY under Project Settings → Script Properties.');
+    Logger.log('School import will run every hour. Run importSchoolEmails now to do the first pass.');
+  }
   Logger.log('Your hub key: ' + key);
 }
 
 function doGet(e) {
   const p = (e && e.parameter) || {};
   if (!authorized_(p.key)) return json_({ error: 'bad key' });
-  const parts = String(p.parts || 'calendar,gmail,meals,list').split(',');
-  const readers = { calendar: calendar_, gmail: gmail_, meals: meals_, list: list_, photos: photos_ };
+  const parts = String(p.parts || 'calendar,meals,list').split(',');
+  const readers = { calendar: calendar_, meals: meals_, list: list_, photos: photos_, school: schoolStatus_ };
   const out = { ok: true, errors: {} };
   parts.forEach(function (part) {
     if (!readers[part]) return;
@@ -127,28 +153,6 @@ function calendar_() {
   return events;
 }
 
-function gmail_() {
-  const threads = GmailApp.search(EMAIL_QUERY, 0, EMAIL_COUNT_CAP);
-  return {
-    unread: threads.length,
-    capped: threads.length >= EMAIL_COUNT_CAP,
-    threads: threads.slice(0, EMAIL_SHOWN).map(function (t) {
-      const msgs = t.getMessages();
-      const last = msgs[msgs.length - 1];
-      return {
-        from: senderName_(last.getFrom()),
-        subject: t.getFirstMessageSubject() || '(no subject)',
-        date: t.getLastMessageDate().toISOString()
-      };
-    })
-  };
-}
-
-function senderName_(from) {
-  const m = String(from).match(/^\s*"?([^"<]+?)"?\s*</);
-  return m ? m[1] : String(from).replace(/[<>]/g, '');
-}
-
 function meals_() {
   const raw = PROPS.getProperty('MEALS');
   return raw ? JSON.parse(raw) : { text: '', at: null };
@@ -189,4 +193,205 @@ function photos_() {
   }
   cache.put('photos', JSON.stringify(ids), 3600);
   return ids;
+}
+
+/* ── School email → calendar ─────────────────────────────────────────────────────────── */
+
+const SCHOOL_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['events'],
+  properties: {
+    events: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['title', 'date', 'end_date', 'start_time', 'end_time', 'location', 'details', 'already_on_calendar'],
+        properties: {
+          title: { type: 'string', description: 'Short calendar title, e.g. "Picture day" or "No school – teacher in-service".' },
+          date: { type: 'string', description: 'YYYY-MM-DD' },
+          end_date: { type: 'string', description: 'YYYY-MM-DD for multi-day events, else empty.' },
+          start_time: { type: 'string', description: '24-hour HH:MM, or empty for all-day.' },
+          end_time: { type: 'string', description: '24-hour HH:MM, or empty.' },
+          location: { type: 'string' },
+          details: { type: 'string', description: 'One or two sentences a parent needs: what to bring, deadlines, links.' },
+          already_on_calendar: { type: 'boolean', description: 'True if this matches an event in the "already on the calendar" list.' }
+        }
+      }
+    }
+  }
+};
+
+/** Runs every hour (installed by setup). Safe to run by hand from the editor. */
+function importSchoolEmails() {
+  if (!SCHOOL_IMPORT) return;
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(1000)) return;
+  const status = { at: new Date().toISOString(), added: 0, emails: 0, error: '' };
+  try {
+    const apiKey = PROPS.getProperty('ANTHROPIC_API_KEY');
+    if (!apiKey) throw new Error('ANTHROPIC_API_KEY is missing from Script Properties');
+    const cal = schoolCalendar_();
+    const seen = JSON.parse(PROPS.getProperty('SCHOOL_SEEN') || '[]');
+    const started = Date.now();
+
+    // Oldest first, so a later "update" email is read after the one it corrects.
+    const messages = [];
+    GmailApp.search('from:' + SCHOOL_DOMAIN + ' newer_than:21d', 0, 30).forEach(function (t) {
+      t.getMessages().forEach(function (m) {
+        if (seen.indexOf(m.getId()) === -1 && m.getFrom().toLowerCase().indexOf(SCHOOL_DOMAIN) !== -1) messages.push(m);
+      });
+    });
+    messages.sort(function (a, b) { return a.getDate() - b.getDate(); });
+
+    for (let i = 0; i < messages.length; i++) {
+      // Apps Script stops a run at 6 minutes; leave the rest for next hour.
+      if (Date.now() - started > 4 * 60 * 1000) break;
+      const m = messages[i];
+      const events = extractEvents_(apiKey, m, knownEvents_(cal));
+      if (events === null) break;              // API trouble: stop and retry these next hour
+      events.forEach(function (ev) { if (addSchoolEvent_(cal, ev, m)) status.added++; });
+      seen.push(m.getId());
+      status.emails++;
+    }
+    PROPS.setProperty('SCHOOL_SEEN', JSON.stringify(seen.slice(-400)));
+  } catch (err) {
+    status.error = String(err.message || err);
+    throw err;
+  } finally {
+    const prev = schoolStatus_();
+    status.total = (prev.total || 0) + status.added;
+    PROPS.setProperty('SCHOOL_STATUS', JSON.stringify(status));
+    lock.releaseLock();
+  }
+}
+
+function schoolStatus_() {
+  const raw = PROPS.getProperty('SCHOOL_STATUS');
+  const st = raw ? JSON.parse(raw) : {};
+  st.enabled = SCHOOL_IMPORT;
+  return st;
+}
+
+function schoolCalendar_() {
+  const found = CalendarApp.getCalendarsByName(SCHOOL_CALENDAR)[0];
+  return found || CalendarApp.createCalendar(SCHOOL_CALENDAR, { selected: true, hidden: false, summary: 'Dates pulled from school email by the Family Hub script.' });
+}
+
+// Upcoming imported events, so Claude can recognize repeats ("reminder: picture day is Friday").
+function knownEvents_(cal) {
+  const tz = cal.getTimeZone();
+  const now = new Date();
+  const later = new Date(now.getTime() + 180 * 864e5);
+  return cal.getEvents(now, later).slice(0, 100).map(function (e) {
+    return Utilities.formatDate(e.getStartTime(), tz, 'yyyy-MM-dd') + ' ' + e.getTitle().replace(SCHOOL_PREFIX, '');
+  });
+}
+
+// Returns the events Claude found (possibly none), or null when the API call itself failed.
+function extractEvents_(apiKey, m, known) {
+  const tz = CalendarApp.getDefaultCalendar().getTimeZone();
+  const sent = m.getDate();
+  const content = [];
+
+  // Flyers and newsletters often arrive as a PDF or picture rather than in the email text.
+  m.getAttachments({ includeInlineImages: false }).forEach(function (a) {
+    const type = a.getContentType();
+    const size = a.getSize();
+    if (content.length >= 5) return;
+    if (type === 'application/pdf' && size < 20 * 1024 * 1024) {
+      content.push({ type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: Utilities.base64Encode(a.getBytes()) } });
+    } else if (/^image\/(jpeg|png|gif|webp)$/.test(type) && size < 5 * 1024 * 1024) {
+      content.push({ type: 'image', source: { type: 'base64', media_type: type, data: Utilities.base64Encode(a.getBytes()) } });
+    }
+  });
+
+  content.push({
+    type: 'text',
+    text: [
+      'This email came from our child\'s school district. Find every date a parent should have on the family calendar:',
+      'no-school days, early releases, school events, conferences and meetings we\'re invited to, picture day, field trips,',
+      'deadlines for forms or payments, and anything the teacher asks us to do by a certain day.',
+      'Skip dates that have already passed, surveys and fundraising with no real date, and district news that doesn\'t ask anything of a family.',
+      'Resolve relative dates ("this Sunday", "next Monday", "tomorrow") against the date the email was sent. If the email gives no date, return no events.',
+      '',
+      'Today: ' + Utilities.formatDate(new Date(), tz, 'EEEE yyyy-MM-dd'),
+      'Email sent: ' + Utilities.formatDate(sent, tz, 'EEEE yyyy-MM-dd HH:mm'),
+      'From: ' + m.getFrom(),
+      'Subject: ' + m.getSubject(),
+      '',
+      'Already on the calendar (mark matches already_on_calendar):',
+      known.length ? known.join('\n') : '(nothing yet)',
+      '',
+      '--- email ---',
+      m.getPlainBody()
+    ].join('\n')
+  });
+
+  const res = UrlFetchApp.fetch('https://api.anthropic.com/v1/messages', {
+    method: 'post',
+    contentType: 'application/json',
+    muteHttpExceptions: true,
+    headers: {
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'anthropic-beta': 'server-side-fallback-2026-07-01'
+    },
+    payload: JSON.stringify({
+      model: CLAUDE_MODEL,
+      max_tokens: 8000,
+      fallbacks: 'default',
+      output_config: { effort: 'low', format: { type: 'json_schema', schema: SCHOOL_SCHEMA } },
+      messages: [{ role: 'user', content: content }]
+    })
+  });
+
+  const code = res.getResponseCode();
+  const body = JSON.parse(res.getContentText() || '{}');
+  if (code !== 200) {
+    const msg = (body.error && body.error.message) || ('HTTP ' + code);
+    if (code === 429 || code >= 500) { Logger.log('Claude busy, retrying next hour: ' + msg); return null; }
+    throw new Error('Claude API: ' + msg);
+  }
+  if (body.stop_reason === 'refusal') { Logger.log('Declined: ' + m.getSubject()); return []; }
+  const text = (body.content || []).filter(function (b) { return b.type === 'text'; }).map(function (b) { return b.text; }).join('');
+  return JSON.parse(text).events;
+}
+
+function addSchoolEvent_(cal, ev, m) {
+  const tz = cal.getTimeZone();
+  const today = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
+  if (ev.already_on_calendar || !/^\d{4}-\d{2}-\d{2}$/.test(ev.date) || (ev.end_date || ev.date) < today) return false;
+
+  const title = SCHOOL_PREFIX + ev.title;
+  const day = Utilities.parseDate(ev.date, tz, 'yyyy-MM-dd');
+  const norm = function (s) { return s.toLowerCase().replace(/[^a-z0-9]/g, ''); };
+  if (cal.getEvents(day, new Date(day.getTime() + 864e5)).some(function (e) { return norm(e.getTitle()) === norm(title); })) return false;
+
+  const opts = {
+    location: ev.location || '',
+    description: (ev.details ? ev.details + '\n\n' : '') + 'From "' + m.getSubject() + '" — ' + m.getFrom()
+  };
+  if (SHARE_WITH.length) { opts.guests = SHARE_WITH.join(','); opts.sendInvites = false; }
+
+  const hasEnd = /^\d{4}-\d{2}-\d{2}$/.test(ev.end_date) && ev.end_date > ev.date;
+  if (/^\d{2}:\d{2}$/.test(ev.start_time)) {
+    const start = Utilities.parseDate(ev.date + ' ' + ev.start_time, tz, 'yyyy-MM-dd HH:mm');
+    let end = /^\d{2}:\d{2}$/.test(ev.end_time)
+      ? Utilities.parseDate((hasEnd ? ev.end_date : ev.date) + ' ' + ev.end_time, tz, 'yyyy-MM-dd HH:mm')
+      : new Date(start.getTime() + 60 * 60000);
+    if (end <= start) end = new Date(start.getTime() + 60 * 60000);
+    cal.createEvent(title, start, end, opts);
+  } else {
+    // Noon keeps the calendar date right even if the script's time zone differs from the calendar's.
+    const noon = new Date(day.getTime() + 12 * 3600e3);
+    if (hasEnd) {
+      const last = Utilities.parseDate(ev.end_date, tz, 'yyyy-MM-dd');
+      cal.createAllDayEvent(title, noon, new Date(last.getTime() + 36 * 3600e3), opts);
+    } else {
+      cal.createAllDayEvent(title, noon, opts);
+    }
+  }
+  return true;
 }
