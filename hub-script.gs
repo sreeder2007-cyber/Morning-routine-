@@ -6,7 +6,7 @@
  * nobody shares a password and nothing is stored anywhere but their own Google account.
  *
  * Setup (once per person — full walkthrough in README.md):
- *   1. Paste this file, then fill in PHOTO_FOLDER_ID below if you want photos (optional).
+ *   1. Paste this file, then fill in ICLOUD_ALBUM or PHOTO_FOLDER_ID below if you want photos (optional).
  *   2. Run `setup` from the toolbar, allow the permissions, and copy the key from the log.
  *   3. Deploy → New deployment → Web app. Execute as: Me. Who has access: Anyone.
  *   4. Put the /exec URL and the key into the hub's Settings.
@@ -23,6 +23,12 @@
 // after /folders/). Share that folder as "Anyone with the link can view" so the tablet can
 // load the images. Leave empty for no photos.
 const PHOTO_FOLDER_ID = '';
+
+// Optional: an iCloud Shared Album for the photo frame. In the Photos app on an iPhone, open the
+// shared album → People (the person icon) → turn on Public Website → Share Link, and paste that
+// link here, e.g. 'https://www.icloud.com/sharedalbum/#B0aBcDeFgHiJkL'. Anyone in the album can
+// add pictures from their phone and they appear on the hub within the hour. Videos are skipped.
+const ICLOUD_ALBUM = '';
 
 // Calendars to show. Empty means every calendar that's checked in your Google Calendar
 // sidebar (yours, shared family calendars, holidays, birthdays). Otherwise list IDs from
@@ -197,7 +203,13 @@ function applyListOp_(list, op) {
 }
 
 function photos_() {
-  if (!PHOTO_FOLDER_ID) return [];
+  let out = [];
+  if (PHOTO_FOLDER_ID) out = out.concat(drivePhotos_());
+  if (ICLOUD_ALBUM) out = out.concat(icloudPhotos_(ICLOUD_ALBUM));
+  return out;
+}
+
+function drivePhotos_() {
   const cache = CacheService.getScriptCache();
   const hit = cache.get('photos');
   if (hit) return JSON.parse(hit);
@@ -209,6 +221,53 @@ function photos_() {
   }
   cache.put('photos', JSON.stringify(ids), 3600);
   return ids;
+}
+
+// Reads a public iCloud Shared Album the way Apple's own album web page does. Apple doesn't
+// document these two calls, so if Apple changes them this is the place to look. Returns
+// full-size image links; Apple signs them for a limited time, so the hub re-asks regularly.
+function icloudPhotos_(link) {
+  const token = String(link).split('#').pop().split(';')[0].trim();
+  if (!/^[A-Za-z0-9]{10,}$/.test(token)) throw new Error('ICLOUD_ALBUM should be the album link ending in #B0…');
+  let host = 'p23-sharedstreams.icloud.com';
+  const call = function (path, body) {
+    for (let tries = 0; tries < 3; tries++) {
+      const res = UrlFetchApp.fetch('https://' + host + '/' + token + '/sharedstreams/' + path, {
+        method: 'post', contentType: 'text/plain', payload: JSON.stringify(body), muteHttpExceptions: true
+      });
+      const code = res.getResponseCode();
+      // Albums live on different Apple servers; the first answer names the right one.
+      if (code === 330) { host = JSON.parse(res.getContentText())['X-Apple-MMe-Host'] || host; continue; }
+      if (code === 404) throw new Error('iCloud album not found. Is Public Website turned on for it?');
+      if (code !== 200) throw new Error('iCloud album: HTTP ' + code);
+      return JSON.parse(res.getContentText());
+    }
+    throw new Error('iCloud album: too many redirects');
+  };
+
+  const stream = call('webstream', { streamCtag: null });
+  const picks = [];
+  (stream.photos || []).forEach(function (p) {
+    if (p.mediaAssetType === 'video') return;
+    // Each photo comes in several sizes; take the biggest one up to 2560px wide.
+    const sizes = Object.keys(p.derivatives || {}).map(function (k) { return p.derivatives[k]; })
+      .filter(function (d) { return d && d.checksum && +d.width; })
+      .sort(function (a, b) { return +a.width - +b.width; });
+    const fit = sizes.filter(function (d) { return +d.width <= 2560; });
+    const pick = fit.length ? fit[fit.length - 1] : sizes[0];
+    if (pick) picks.push({ guid: p.photoGuid, checksum: pick.checksum });
+  });
+
+  const urls = [];
+  for (let i = 0; i < picks.length && i < 500; i += 25) {
+    const batch = picks.slice(i, i + 25);
+    const assets = call('webasseturls', { photoGuids: batch.map(function (b) { return b.guid; }) });
+    batch.forEach(function (b) {
+      const item = assets.items && assets.items[b.checksum];
+      if (item && item.url_location && item.url_path) urls.push('https://' + item.url_location + item.url_path);
+    });
+  }
+  return urls;
 }
 
 // An event typed on the hub. Created through the Calendar API rather than CalendarApp so it can

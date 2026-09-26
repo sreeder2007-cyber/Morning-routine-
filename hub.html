@@ -7,7 +7,7 @@
 <meta name="theme-color" content="#f4efe8">
 <meta name="mobile-web-app-capable" content="yes">
 <!-- Only the services the hub actually uses may be reached; no outside scripts, frames or plugins. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob: https://drive.google.com https://*.googleusercontent.com https://picsum.photos https://fastly.picsum.photos; connect-src https://script.google.com https://script.googleusercontent.com https://api.open-meteo.com https://geocoding-api.open-meteo.com; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob: https://drive.google.com https://*.googleusercontent.com https://*.icloud-content.com https://picsum.photos https://fastly.picsum.photos; connect-src https://script.google.com https://script.googleusercontent.com https://api.open-meteo.com https://geocoding-api.open-meteo.com; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'">
 <meta name="referrer" content="no-referrer">
 <title>Family Hub</title>
 <link rel="manifest" href="hub-manifest.json">
@@ -342,7 +342,7 @@
 
   const COLORS = ['#e76f51', '#2a9d8f', '#7c5cbf', '#e9a23b', '#3a86ff', '#d6457a'];
   const DEFAULTS = { members: [], zip: '', idleMin: 10, photoSec: 20, days: 3, workFrom: 8, workTo: 17, weekStart: 5, nightFrom: 22, nightTo: 6, demo: false };
-  const REFRESH_MS = 5 * 60 * 1000, PHOTO_REFRESH_MS = 60 * 60 * 1000, NIGHT_IDLE_MS = 2 * 60 * 1000;
+  const REFRESH_MS = 5 * 60 * 1000, PHOTO_REFRESH_MS = 40 * 60 * 1000, NIGHT_IDLE_MS = 2 * 60 * 1000;
 
   // Settings can arrive in a setup link someone texted, so treat every field as untrusted:
   // colors go into inline styles and URLs get fetched, so only allow the expected shapes.
@@ -920,8 +920,12 @@
   }
 
   /* ── Photo frame & night mode ── */
+  // The script returns Drive file IDs (Drive folder) or full image links (iCloud Shared Album).
+  const isIcloudImage = u => { try { const h = new URL(u); return h.protocol === 'https:' && h.hostname.endsWith('.icloud-content.com'); } catch { return false; } };
   const photoUrls = () => demoOn() ? demoPhotos()
-    : connected().flatMap(m => (data[m.id]?.photos || []).map(id => `https://drive.google.com/thumbnail?id=${encodeURIComponent(id)}&sz=w1920`));
+    : connected().flatMap(m => (data[m.id]?.photos || []).map(p =>
+        /^https:/.test(p) ? (isIcloudImage(p) ? p : null) : `https://drive.google.com/thumbnail?id=${encodeURIComponent(p)}&sz=w1920`)).filter(Boolean);
+  let lastPhotoRefresh = 0;
   const saver = { on: false, timer: null, order: [], i: 0, layer: 0 };
   let lastTouch = Date.now();
 
@@ -929,6 +933,9 @@
     const urls = photoUrls();
     $('#saver-empty').hidden = urls.length > 0;
     if (!urls.length) return;
+    // New links after a refresh (iCloud's expire): start a fresh shuffle with them.
+    const sig = urls.length + '|' + urls[0];
+    if (sig !== saver.sig) { saver.sig = sig; saver.i = Infinity; }
     if (saver.i >= saver.order.length) {
       saver.order = urls.slice().sort(() => Math.random() - .5);
       saver.i = 0;
@@ -944,6 +951,11 @@
       next.classList.add('show');
       slides[saver.layer].classList.remove('show');
       saver.layer ^= 1;
+    };
+    // An expired or missing photo: move straight on, and fetch fresh links (at most every 5 minutes).
+    img.onerror = () => {
+      if (Date.now() - lastPhotoRefresh > 5 * 60 * 1000) { lastPhotoRefresh = Date.now(); refreshAll(['photos']); }
+      if (saver.on && !saver.skipping) { saver.skipping = true; setTimeout(() => { saver.skipping = false; nextPhoto(); }, 300); }
     };
     img.src = url;
   }

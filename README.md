@@ -224,12 +224,25 @@ tag. If the note has no day names, the hub shows the whole thing.
 
 ### 3. Photos (optional)
 
-Make a Google Drive folder (e.g. "Family Hub Photos") and drop pictures in. Google Photos
-can't be used because it no longer lets outside apps read your library. Share the folder as
-**Anyone with the link → Viewer**, so the tablet can show the images without being signed
-in. Then copy the ID from the folder's address (`drive.google.com/drive/folders/THIS_PART`)
-into `PHOTO_FOLDER_ID` and publish a new version. Only one of you needs to do this, and if
-you both do, both folders show up. New photos appear within the hour.
+**iCloud Shared Album (easiest for iPhones).** Anyone in the album adds pictures from their
+phone as usual, and they show on the hub's photo frame within the hour.
+
+1. On an iPhone, in **Photos**, open the shared album (or create one under **Albums → + → New
+   Shared Album**).
+2. Tap the **People** icon, turn on **Public Website**, and tap **Share Link** → **Copy**.
+3. In the script, paste that link into `ICLOUD_ALBUM`, then save and publish a new version.
+
+Videos are skipped. With Public Website on, anyone who has the album link can see the photos,
+the same as a Drive folder shared by link. The link is only in your script, never in this
+repository. The hub reads the album the way Apple's album web page does. Apple doesn't
+document that, so if Apple ever changes it, the Drive option below still works.
+
+**Google Drive folder.** Put pictures in a Drive folder, share it as **Anyone with the link →
+Viewer**, and paste the folder's ID (`drive.google.com/drive/folders/THIS_PART`) into
+`PHOTO_FOLDER_ID`. Google Photos can't be used, because it no longer lets outside apps read your library.
+
+You can use both: the frame mixes them. If both of you set a photo source in your own
+scripts, both show.
 
 ### 4. The tablet
 
