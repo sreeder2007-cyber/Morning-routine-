@@ -139,6 +139,7 @@ function calendar_() {
         start: allDay ? Utilities.formatDate(ev.getAllDayStartDate(), tz, 'yyyy-MM-dd') : ev.getStartTime().toISOString(),
         end: allDay ? Utilities.formatDate(ev.getAllDayEndDate(), tz, 'yyyy-MM-dd') : ev.getEndTime().toISOString(),
         location: ev.getLocation() || '',
+        private: ev.getVisibility() === CalendarApp.Visibility.PRIVATE,
         calendar: cal.getName()
       });
     });
@@ -188,28 +189,48 @@ function photos_() {
   return ids;
 }
 
-// An event typed on the hub. Times are read in the calendar's own time zone.
+// An event typed on the hub. Created through the Calendar API rather than CalendarApp so it can
+// be marked private and so invites go only to work addresses (Outlook and other non-Google
+// calendars) while family Gmail guests just get it on their calendar without an email.
 function addEvent_(ev) {
   const cal = CalendarApp.getDefaultCalendar();
   const tz = cal.getTimeZone();
   const title = String(ev.title || '').trim().slice(0, 200);
   if (!title || !/^\d{4}-\d{2}-\d{2}$/.test(ev.date)) throw new Error('bad event');
   const isTime = function (t) { return /^\d{2}:\d{2}$/.test(t || ''); };
+  const isEmail = function (g) { return /^[^\s@,]+@[^\s@,]+\.[^\s@,]+$/.test(g); };
 
-  const opts = {};
-  if (ev.location) opts.location = String(ev.location).slice(0, 200);
-  const guests = (ev.guests || []).filter(function (g) { return /^[^\s@,]+@[^\s@,]+\.[^\s@,]+$/.test(g); });
-  if (guests.length) { opts.guests = guests.join(','); opts.sendInvites = false; }
+  const body = { summary: title };
+  if (ev.location) body.location = String(ev.location).slice(0, 200);
+  if (ev.private) body.visibility = 'private';
+  const guests = [].concat(ev.guests || [], ev.workGuests || []).filter(isEmail);
+  if (guests.length) body.attendees = guests.map(function (g) { return { email: g }; });
 
   if (isTime(ev.start)) {
-    const start = Utilities.parseDate(ev.date + ' ' + ev.start, tz, 'yyyy-MM-dd HH:mm');
-    let end = isTime(ev.end) ? Utilities.parseDate(ev.date + ' ' + ev.end, tz, 'yyyy-MM-dd HH:mm') : null;
-    if (!end || end <= start) end = new Date(start.getTime() + 60 * 60000);
-    cal.createEvent(title, start, end, opts);
+    // No end (or one before the start): an hour long, stopping at midnight.
+    const oneHour = function (t) {
+      const m = Math.min(+t.slice(0, 2) * 60 + +t.slice(3) + 60, 23 * 60 + 59);
+      return ('0' + Math.floor(m / 60)).slice(-2) + ':' + ('0' + m % 60).slice(-2);
+    };
+    const end = isTime(ev.end) && ev.end > ev.start ? ev.end : oneHour(ev.start);
+    body.start = { dateTime: ev.date + 'T' + ev.start + ':00', timeZone: tz };
+    body.end = { dateTime: ev.date + 'T' + end + ':00', timeZone: tz };
   } else {
-    // Noon keeps the calendar date right even if the script's time zone differs from the calendar's.
-    const noon = new Date(Utilities.parseDate(ev.date, tz, 'yyyy-MM-dd').getTime() + 12 * 3600e3);
-    cal.createAllDayEvent(title, noon, opts);
+    const next = new Date(Utilities.parseDate(ev.date, 'UTC', 'yyyy-MM-dd').getTime() + 864e5);
+    body.start = { date: ev.date };
+    body.end = { date: Utilities.formatDate(next, 'UTC', 'yyyy-MM-dd') };
+  }
+
+  const res = UrlFetchApp.fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events?sendUpdates=externalOnly', {
+    method: 'post',
+    contentType: 'application/json',
+    headers: { Authorization: 'Bearer ' + ScriptApp.getOAuthToken() },
+    payload: JSON.stringify(body),
+    muteHttpExceptions: true
+  });
+  if (res.getResponseCode() !== 200) {
+    const err = JSON.parse(res.getContentText() || '{}').error;
+    throw new Error('Calendar: ' + ((err && err.message) || res.getResponseCode()));
   }
 }
 

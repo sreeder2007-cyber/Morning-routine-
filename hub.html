@@ -307,7 +307,7 @@
   const save = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
 
   const COLORS = ['#e76f51', '#2a9d8f', '#7c5cbf', '#e9a23b', '#3a86ff', '#d6457a'];
-  const DEFAULTS = { members: [], zip: '', idleMin: 10, photoSec: 20, days: 3, nightFrom: 22, nightTo: 6, demo: false };
+  const DEFAULTS = { members: [], zip: '', idleMin: 10, photoSec: 20, days: 3, workFrom: 8, workTo: 17, nightFrom: 22, nightTo: 6, demo: false };
   const REFRESH_MS = 5 * 60 * 1000, PHOTO_REFRESH_MS = 60 * 60 * 1000, NIGHT_IDLE_MS = 2 * 60 * 1000;
 
   let cfg = { ...DEFAULTS, ...load(K_CFG, {}) };
@@ -340,7 +340,7 @@
   }
 
   /* ── Members & Apps Script calls ── */
-  const DEMO_MEMBERS = [{ id: 'demo-a', name: 'Dad', color: COLORS[1], email: 'dad@example.com' }, { id: 'demo-b', name: 'Mom', color: COLORS[0], email: 'mom@example.com' }];
+  const DEMO_MEMBERS = [{ id: 'demo-a', name: 'Dad', color: COLORS[1], email: 'dad@example.com', workEmail: 'dad@work.example' }, { id: 'demo-b', name: 'Mom', color: COLORS[0], email: 'mom@example.com', workEmail: 'mom@work.example' }];
   const demoOn = () => cfg.demo && !cfg.members.length;
   const members = () => demoOn() ? DEMO_MEMBERS : cfg.members;
   const connected = () => cfg.members.filter(m => m.url && m.key);
@@ -484,7 +484,7 @@
         const state = e.getTime() <= now ? ' past' : s.getTime() <= now ? ' now' : '';
         const time = (s < day ? 'cont.' : fmtTime(s)) + (days === 3 ? ` – ${fmtTime(e)}` : '');
         const loc = ev.location ? `<span class="loc">📍 ${esc(ev.location)}</span>` : '';
-        return `<button class="ev${state}" style="--c:${c}" data-ev="${idx}"><div class="t">${time}${dots}</div><div class="n">${esc(ev.title)}</div>${loc}</button>`;
+        return `<button class="ev${state}" style="--c:${c}" data-ev="${idx}"><div class="t">${time}${dots}</div><div class="n">${ev.private ? '🔒 ' : ''}${esc(ev.title)}</div>${loc}</button>`;
       };
       const body = allDay.length + timed.length ? allDay.map(chip).join('') + timed.map(chip).join('') : '<div class="empty-day">Nothing planned</div>';
       const w = wx?.days?.find(d => d.t === dayKey(day));
@@ -851,12 +851,21 @@
         <label class="field">Where (optional)<input id="ae-loc" maxlength="200" autocomplete="off"></label>
         ${ms.length > 1 ? `<label class="field">Whose calendar<select id="ae-who">${ms.map((m, i) => `<option value="${i}">${esc(m.name)}</option>`).join('')}</select></label>` : ''}
         <label class="check" id="ae-invite-row"${others(ms[0]).length ? '' : ' hidden'}><input type="checkbox" id="ae-invite" checked> Invite everyone else, so it's on their calendar too</label>
+        <label class="check" id="ae-work-row" hidden><input type="checkbox" id="ae-work" checked> <span>During work hours: make it private and send it to <span id="ae-work-to"></span></span></label>
         <div class="actions" style="margin-top:4px">
           <button type="button" class="btn ghost" data-act="close">Cancel</button>
           <button class="btn" id="ae-save">Add</button>
         </div>
       </form>`);
     $('#ae-who')?.addEventListener('change', e => { $('#ae-invite-row').hidden = !others(ms[+e.target.value]).length; });
+    const workEmails = ms.map(m => m.workEmail).filter(Boolean);
+    const checkWork = () => {
+      const on = workEmails.length > 0 && duringWork($('#ae-date').value, $('#ae-start').value, $('#ae-end').value);
+      $('#ae-work-row').hidden = !on;
+      $('#ae-work-to').textContent = workEmails.join(' and ');
+    };
+    ['#ae-date', '#ae-start', '#ae-end'].forEach(id => $(id).addEventListener('input', checkWork));
+    checkWork();
     setTimeout(() => $('#ae-title')?.focus(), 50);
     $('#add-form').addEventListener('submit', async e => {
       e.preventDefault();
@@ -870,6 +879,7 @@
         location: $('#ae-loc').value.trim(),
         guests: $('#ae-invite').checked ? others(who).map(o => o.email) : []
       };
+      if (!$('#ae-work-row').hidden && $('#ae-work').checked) { ev.private = true; ev.workGuests = workEmails; }
       if (!ev.title || !ev.date) return;
       if (demoOn()) { addDemoEvent(who, ev); closeSheet(); render(); toast('Added (sample data only)'); return; }
       const btn = $('#ae-save');
@@ -888,12 +898,22 @@
       }
     });
   }
+  // A timed event on Monday–Friday that overlaps the work day set in Settings.
+  function duringWork(date, start, end) {
+    if (!date || !start) return false;
+    const dow = parseDay(date).getDay();
+    if (dow === 0 || dow === 6) return false;
+    const mins = t => +t.slice(0, 2) * 60 + +t.slice(3);
+    const s = mins(start), e = end && end > start ? mins(end) : s + 60;
+    return s < (+cfg.workTo) * 60 && e > (+cfg.workFrom) * 60;
+  }
+
   function addDemoEvent(who, ev) {
     const d = parseDay(ev.date);
     const at = t => { const [h, m] = t.split(':').map(Number); const x = new Date(d); x.setHours(h, m); return x; };
     const start = ev.start ? at(ev.start) : null;
     const end = ev.start ? (ev.end && at(ev.end) > start ? at(ev.end) : new Date(start.getTime() + 3600e3)) : null;
-    const out = { id: uid(), title: ev.title, location: ev.location, calendar: 'Family', allDay: !ev.start,
+    const out = { id: uid(), title: ev.title, location: ev.location, calendar: 'Family', allDay: !ev.start, private: !!ev.private,
       start: ev.start ? start.toISOString() : ev.date, end: ev.start ? end.toISOString() : dayKey(addDays(d, 1)) };
     demo[who.id].calendar.push(out);
     if (ev.guests.length) DEMO_MEMBERS.filter(m => m !== who).forEach(m => demo[m.id].calendar.push(out));
@@ -919,6 +939,7 @@
         <label class="field">Script URL (ends in /exec)<input data-f="url" value="${esc(m.url)}" placeholder="https://script.google.com/macros/s/…/exec" inputmode="url"></label>
         <label class="field">Key<input data-f="key" value="${esc(m.key)}" placeholder="from the script's setup log"></label>
         <label class="field">Google email (so others can invite them to events)<input data-f="email" value="${esc(m.email || '')}" placeholder="name@gmail.com" inputmode="email"></label>
+        <label class="field">Work email (gets a private invite for anything during work hours)<input data-f="workEmail" value="${esc(m.workEmail || '')}" placeholder="name@company.com" inputmode="email"></label>
         <div class="member-foot">
           <button type="button" class="btn ghost" data-act="test">Test connection</button>
           <span class="test-out"></span>
@@ -939,6 +960,8 @@
         <label class="field">Seconds per photo<input id="s-psec" type="number" min="5" max="600" value="${esc(draft.photoSec)}"></label>
         <label class="field">Screen goes dark at<select id="s-nf">${hours(draft.nightFrom)}</select></label>
         <label class="field">…and wakes at<select id="s-nt">${hours(draft.nightTo)}</select></label>
+        <label class="field">Work day starts<select id="s-wf">${hours(draft.workFrom)}</select></label>
+        <label class="field">…and ends<select id="s-wt">${hours(draft.workTo)}</select></label>
       </div>
       <h3>Set up another screen</h3>
       <div class="hint">Copies a link with these settings, keys included — open it on the tablet instead of typing everything again. Only send it to each other.</div>
@@ -958,6 +981,8 @@
     draft.idleMin = Math.max(0, +$('#s-idle').value || 0);
     draft.photoSec = Math.max(5, +$('#s-psec').value || 20);
     draft.days = +$('#s-days').value;
+    draft.workFrom = +$('#s-wf').value;
+    draft.workTo = +$('#s-wt').value;
     draft.nightFrom = +$('#s-nf').value;
     draft.nightTo = +$('#s-nt').value;
   }
@@ -1021,7 +1046,7 @@
     if (act === 'add-member') {
       readSettingsForm();
       const used = draft.members.map(m => m.color);
-      draft.members.push({ id: uid(), name: '', color: COLORS.find(c => !used.includes(c)) || COLORS[0], url: '', key: '', email: '' });
+      draft.members.push({ id: uid(), name: '', color: COLORS.find(c => !used.includes(c)) || COLORS[0], url: '', key: '', email: '', workEmail: '' });
       renderSettings();
     }
     if (act === 'remove') {

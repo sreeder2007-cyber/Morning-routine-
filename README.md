@@ -106,11 +106,19 @@ straight to that person's Google Calendar and appears on the hub right away. Tic
 everyone else** to put it on the others' calendars too; that needs each person's Google
 email filled in under ⚙️ Settings, and no invite email is sent.
 
+**During work hours** (Monday–Friday, 8am–5pm by default; change it in Settings), the form
+offers to make the event **private** and send an invite to each person's **work email**
+(also in Settings), so it blocks the time on work calendars without coworkers seeing what
+it is. Only the work addresses get an invite email. Family members' Google calendars
+still get it quietly. Private events show a 🔒 on the hub. Evenings, weekends and all-day
+events are left alone.
+
 The 3-day view (the default) also shows each day's forecast and that night's dinner from
 the meals note. Switch to 5 or 7 days in Settings for more days at a glance.
 
-If you set up the script before this feature existed, paste in the latest `hub-script.gs`
-and publish a new version (**Deploy → Manage deployments → ✏️ → New version**).
+If you set up the script before this feature existed, paste in the latest `hub-script.gs`,
+run **setup** once to allow the new permission (it adds events through the Calendar API), and
+publish a new version (**Deploy → Manage deployments → ✏️ → New version**).
 
 ### 1b. School dates from APS email and photos (automatic)
 
@@ -124,6 +132,8 @@ and Google Drive connections on that Claude account. Each run:
   conferences, field trips, form and payment deadlines) to Scott's calendar, with a 🏫 in
   front of school items, and invites Carolyn so it's on her calendar too. No invite email
   is sent.
+- makes anything during work hours (a timed event Monday–Friday that overlaps 8am–5pm)
+  private and invites both work emails, the same way the hub's **+ Add** does.
 
 It works out relative dates ("this Sunday") from when the email was sent or the photo was
 taken. Before adding anything it checks the calendar, so reminder emails don't create
