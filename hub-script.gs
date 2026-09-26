@@ -51,6 +51,16 @@ function setup() {
   Logger.log('Your hub key: ' + key);
 }
 
+/**
+ * Run this if the tablet is lost or a setup link went somewhere it shouldn't. The old key
+ * stops working at once; put the new one into the hub's Settings.
+ */
+function newKey() {
+  const key = Utilities.getUuid().replace(/-/g, '') + Utilities.getUuid().replace(/-/g, '');
+  PROPS.setProperty('HUB_KEY', key);
+  Logger.log('Your new hub key: ' + key);
+}
+
 function doGet(e) {
   const p = (e && e.parameter) || {};
   if (!authorized_(p.key)) return json_({ error: 'bad key' });
@@ -80,6 +90,10 @@ function doPost(e) {
       const text = String(body.text || '').slice(0, 8000);
       PROPS.setProperty('MEALS', JSON.stringify({ text: text, at: new Date().toISOString() }));
       return json_({ ok: true, meals: meals_() });
+    }
+    if (body.action === 'addEvent') {
+      try { addEvent_(body); } catch (err) { return json_({ error: String(err.message || err) }); }
+      return json_({ ok: true, calendar: calendar_() });
     }
     if (body.action === 'upload') {
       const bytes = Utilities.base64Decode(String(body.data || ''));
@@ -135,6 +149,7 @@ function calendar_() {
         start: allDay ? Utilities.formatDate(ev.getAllDayStartDate(), tz, 'yyyy-MM-dd') : ev.getStartTime().toISOString(),
         end: allDay ? Utilities.formatDate(ev.getAllDayEndDate(), tz, 'yyyy-MM-dd') : ev.getEndTime().toISOString(),
         location: ev.getLocation() || '',
+        private: ev.getVisibility() === CalendarApp.Visibility.PRIVATE,
         calendar: cal.getName()
       });
     });
@@ -182,6 +197,54 @@ function photos_() {
   }
   cache.put('photos', JSON.stringify(ids), 3600);
   return ids;
+}
+
+// An event typed on the hub. Created through the Calendar API rather than CalendarApp so it can
+// be marked private and so invites go only to work addresses (Outlook and other non-Google
+// calendars) while family Gmail guests just get it on their calendar without an email.
+function addEvent_(ev) {
+  const cal = CalendarApp.getDefaultCalendar();
+  const tz = cal.getTimeZone();
+  const title = String(ev.title || '').trim().slice(0, 200);
+  if (!title || !/^\d{4}-\d{2}-\d{2}$/.test(ev.date)) throw new Error('bad event');
+  const isTime = function (t) { return /^\d{2}:\d{2}$/.test(t || ''); };
+  const isEmail = function (g) { return /^[^\s@,]+@[^\s@,]+\.[^\s@,]+$/.test(g); };
+
+  const body = { summary: title };
+  if (ev.location) body.location = String(ev.location).slice(0, 200);
+  if (ev.private) body.visibility = 'private';
+  // Family members are regular guests; work addresses are optional, so the invite reads as
+  // an FYI hold on the work calendar rather than a meeting to accept.
+  const attendees = (ev.guests || []).filter(isEmail).map(function (g) { return { email: g }; })
+    .concat((ev.workGuests || []).filter(isEmail).map(function (g) { return { email: g, optional: true }; }));
+  if (attendees.length) body.attendees = attendees;
+
+  if (isTime(ev.start)) {
+    // No end (or one before the start): an hour long, stopping at midnight.
+    const oneHour = function (t) {
+      const m = Math.min(+t.slice(0, 2) * 60 + +t.slice(3) + 60, 23 * 60 + 59);
+      return ('0' + Math.floor(m / 60)).slice(-2) + ':' + ('0' + m % 60).slice(-2);
+    };
+    const end = isTime(ev.end) && ev.end > ev.start ? ev.end : oneHour(ev.start);
+    body.start = { dateTime: ev.date + 'T' + ev.start + ':00', timeZone: tz };
+    body.end = { dateTime: ev.date + 'T' + end + ':00', timeZone: tz };
+  } else {
+    const next = new Date(Utilities.parseDate(ev.date, 'UTC', 'yyyy-MM-dd').getTime() + 864e5);
+    body.start = { date: ev.date };
+    body.end = { date: Utilities.formatDate(next, 'UTC', 'yyyy-MM-dd') };
+  }
+
+  const res = UrlFetchApp.fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events?sendUpdates=externalOnly', {
+    method: 'post',
+    contentType: 'application/json',
+    headers: { Authorization: 'Bearer ' + ScriptApp.getOAuthToken() },
+    payload: JSON.stringify(body),
+    muteHttpExceptions: true
+  });
+  if (res.getResponseCode() !== 200) {
+    const err = JSON.parse(res.getContentText() || '{}').error;
+    throw new Error('Calendar: ' + ((err && err.message) || res.getResponseCode()));
+  }
 }
 
 function inboxFolder_() {
