@@ -174,6 +174,23 @@ script creates the folder when you run **setup**.
 and the behavior log by name. Either remove the names, or make the repository private.
 GitHub Pages for a private repository needs a paid GitHub plan.
 
+### Paul's view
+
+The **🧒 Paul** button at the top turns the tablet into a view for Paul: the same night-sky look
+as his morning routine, big pictures and one or two words. It shows **today** as 🏫 *School
+day*, 🏠 *Home day* (with the reason, e.g. *Fall Break*) or 💻 *School at home*, plus the next
+seven days as small picture tiles. Tapping a picture reads it aloud ("On Tuesday, it's a home
+day. No school! It's Fall Break."). ✕ goes back, and so does leaving it alone for three minutes.
+
+How a day is decided:
+- **Home day:** Saturdays and Sundays; closures, breaks and holidays on the APS district
+  calendar (or 🏫 events the school-dates task added); and anything on your calendar titled
+  **"No school"** or **"Home day"**. Use that for trips, like `No school - Disney`.
+- **School at home:** APS virtual-learning days.
+- **School day:** everything else. Early releases say *Short day*.
+
+The button's name is in Settings (*Child's name*); leave it blank to hide the button.
+
 ### Dinner planning
 
 Tap **Plan dinners** on the dinner card. The planner shows a week of dinners, **Friday to

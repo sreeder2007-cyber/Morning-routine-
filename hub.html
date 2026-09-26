@@ -225,6 +225,54 @@
     background: radial-gradient(ellipse at 20% 10%, #3b2d5e, transparent 60%), radial-gradient(ellipse at 90% 90%, #5e2d3a, transparent 60%), #140f1f;
   }
 
+  /* Paul's view: the same night-sky look as his morning routine, big pictures, few words. */
+  .kid-btn {
+    border: 0; border-radius: 16px; height: 52px; padding: 0 18px; font-size: 20px; font-weight: 800;
+    background: linear-gradient(135deg, #7c5cbf, #4f3a99); color: #fff; box-shadow: var(--shadow);
+  }
+  .kid-btn:empty { display: none; }
+  #kid {
+    color: #fff; overflow-y: auto;
+    background: radial-gradient(ellipse 900px 500px at 50% -10%, rgba(255,160,60,.30), transparent),
+                radial-gradient(ellipse 700px 600px at 10% 90%, rgba(124,92,191,.40), transparent),
+                linear-gradient(180deg, #2d0f5c 0%, #1a0a2e 60%, #0d0820 100%);
+  }
+  .kid-close {
+    position: fixed; top: max(16px, env(safe-area-inset-top)); right: 16px; z-index: 2;
+    width: 56px; height: 56px; border-radius: 50%; border: 0; font-size: 24px; font-weight: 800;
+    background: rgba(255,255,255,.14); color: #fff;
+  }
+  .kid-wrap { min-height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 28px; padding: 40px 20px; }
+  .kid-today {
+    border: 0; color: inherit; font: inherit; text-align: center; cursor: pointer;
+    width: min(680px, 100%); padding: 28px 24px 30px; border-radius: 36px;
+    background: rgba(255,255,255,.10); border: 3px solid rgba(255,255,255,.18);
+  }
+  .kid-today.school { background: rgba(86,227,159,.16); border-color: rgba(86,227,159,.55); }
+  .kid-today.home { background: rgba(255,179,71,.16); border-color: rgba(255,179,71,.55); }
+  .kid-today.virtual { background: rgba(79,195,247,.16); border-color: rgba(79,195,247,.55); }
+  .kid-day { font-size: 34px; font-weight: 900; letter-spacing: .02em; opacity: .9; }
+  .kid-icon { font-size: 190px; line-height: 1.1; margin: 6px 0; }
+  .kid-word { font-size: 60px; font-weight: 900; line-height: 1.05; }
+  .kid-why { font-size: 30px; font-weight: 800; opacity: .85; margin-top: 8px; }
+  .kid-week { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+  .kid-mini {
+    border: 0; color: inherit; font: inherit; cursor: pointer; width: 96px; padding: 12px 6px 14px; border-radius: 22px;
+    background: rgba(255,255,255,.08); border: 2px solid transparent; text-align: center;
+  }
+  .kid-mini.school { border-color: rgba(86,227,159,.45); }
+  .kid-mini.home { border-color: rgba(255,179,71,.45); }
+  .kid-mini.virtual { border-color: rgba(79,195,247,.45); }
+  .kid-mini b { display: block; font-size: 22px; font-weight: 900; }
+  .kid-mini span { font-size: 46px; line-height: 1.2; }
+  .kid-mini small { display: block; font-size: 15px; font-weight: 800; opacity: .85; }
+  .kid-hint { font-size: 18px; font-weight: 700; opacity: .6; }
+  @media (max-width: 640px) {
+    .kid-icon { font-size: 130px; }
+    .kid-word { font-size: 44px; }
+    .kid-mini { width: 76px; }
+    .kid-mini span { font-size: 36px; }
+  }
   #night { background: #000; color: #5a5048; display: grid; place-items: center; }
   #night .clock { font-size: 120px; font-weight: 700; }
 
@@ -297,6 +345,7 @@
     </div>
     <div class="wx" id="wx"></div>
     <div class="tools">
+      <button class="kid-btn" id="btn-kid" data-act="kid"></button>
       <button class="icon-btn" id="btn-snap" title="Add to calendar from a photo" aria-label="Add to calendar from a photo">📷</button>
       <button class="icon-btn" id="btn-photos" title="Photo frame" aria-label="Photo frame">🖼️</button>
       <a class="icon-btn" href="index.html" title="Morning routine" aria-label="Morning routine">☀️</a>
@@ -326,6 +375,10 @@
   </div>
 </div>
 
+<div class="overlay" id="kid" hidden>
+  <button class="kid-close" data-act="kid-close" aria-label="Back to the family view">✕</button>
+  <div class="kid-wrap" id="kid-body"></div>
+</div>
 <div class="overlay" id="night" hidden><div class="clock" data-clock></div></div>
 <div class="overlay" id="modal" hidden><div class="sheet" id="sheet"></div></div>
 <div id="toast" hidden></div>
@@ -341,7 +394,7 @@
   const save = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
 
   const COLORS = ['#e76f51', '#2a9d8f', '#7c5cbf', '#e9a23b', '#3a86ff', '#d6457a'];
-  const DEFAULTS = { members: [], zip: '', idleMin: 10, photoSec: 20, days: 3, workFrom: 8, workTo: 17, weekStart: 5, nightFrom: 22, nightTo: 6, demo: false };
+  const DEFAULTS = { members: [], zip: '', idleMin: 10, photoSec: 20, days: 3, workFrom: 8, workTo: 17, weekStart: 5, kidName: 'Paul', nightFrom: 22, nightTo: 6, demo: false };
   const REFRESH_MS = 5 * 60 * 1000, PHOTO_REFRESH_MS = 40 * 60 * 1000, NIGHT_IDLE_MS = 2 * 60 * 1000;
 
   // Settings can arrive in a setup link someone texted, so treat every field as untrusted:
@@ -367,6 +420,7 @@
     c.weekStart = num(c.weekStart, 0, 6, DEFAULTS.weekStart);
     c.pinSalt = /^[0-9a-f]{32}$/.test(c.pinSalt || '') ? c.pinSalt : '';
     c.pinHash = /^[0-9a-f]{64}$/.test(c.pinHash || '') && c.pinSalt ? c.pinHash : '';
+    c.kidName = str(c.kidName, 20).replace(/[<>&"']/g, '');
     c.demo = !!c.demo;
     return c;
   }
@@ -456,7 +510,9 @@
     const at = (day, h, m = 0) => { const d = addDays(t, day); d.setHours(h, m); return d.toISOString(); };
     const ev = (day, h, m, dur, title, location = '') => ({ id: title + day, title, allDay: false, start: at(day, h, m), end: new Date(new Date(at(day, h, m)).getTime() + dur * 60000).toISOString(), location, calendar: 'Family' });
     const all = (day, len, title) => ({ id: title, title, allDay: true, start: dayKey(addDays(t, day)), end: dayKey(addDays(t, day + len)), location: '', calendar: 'Family' });
+    const aps = (day, title) => ({ ...all(day, 1, title), calendar: 'APS SY 2026-2027 Calendar' });
     const shared = [ev(0, 17, 30, 60, 'Family dinner at Grandma’s', '12 Oak St'), all(4, 1, 'Paul’s birthday 🎂'),
+      aps(3, 'Fall Break - Schools Closed'), aps(5, 'Parent Teacher Conferences - Virtual Learning Days'),
       all(2, 1, '🏫 Picture day'), ev(5, 8, 15, 30, '🏫 Parent–teacher conference', 'Room 12')];
     const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     const plan = ['Pancakes & fruit / Pot roast', 'Oatmeal / Tacos', 'Eggs & toast / Spaghetti and meatballs', 'Yogurt parfaits / Chicken stir-fry', 'Waffles / Sheet-pan salmon', 'Smoothies / Homemade pizza night', 'French toast / Burgers on the grill'];
@@ -917,7 +973,8 @@
   }
 
   function render() {
-    renderWeek(); renderMeals(); renderList(); renderStatus(); renderSaverInfo();
+    renderWeek(); renderMeals(); renderList(); renderStatus(); renderSaverInfo(); renderKidButton();
+    if (!$('#kid').hidden) renderKid();
   }
 
   /* ── Photo frame & night mode ── */
@@ -991,9 +1048,10 @@
     const idle = Date.now() - lastTouch;
     const busy = !$('#modal').hidden;
     if (idle > 60000) document.activeElement?.blur?.();
-    const night = inNight() && idle > NIGHT_IDLE_MS && !busy;
+    const night = inNight() && idle > NIGHT_IDLE_MS && !busy && $('#kid').hidden;
     $('#night').hidden = !night;
     if (night) { if (saver.on) stopSaver(); return; }
+    if (!$('#kid').hidden) { if (idle > 3 * 60000) closeKid(); return; }
     if (!saver.on && +cfg.idleMin > 0 && idle > cfg.idleMin * 60000 && !busy) startSaver();
   }
   function wake() {
@@ -1003,6 +1061,82 @@
     if (!$('#night').hidden) { $('#night').hidden = true; return true; }
     return false;
   }
+
+  /* ── Paul's view: school day or home day ──
+     Home: weekends; anything titled "No school" / "Home day" on any calendar (so a family trip
+     can be marked); and closures, breaks and holidays on a school calendar (the APS district
+     calendar, or events the school-dates task added with 🏫). */
+  const SCHOOL_CAL = /\baps\b|school/i;
+  function dayType(day) {
+    const { allDay, timed } = eventsOn(day, mergedEvents());
+    const evs = [...allDay, ...timed];
+    const fromSchool = e => SCHOOL_CAL.test(e.calendar || '') || /^🏫/.test(e.title);
+    // "Fall Break - Schools Closed" → "Fall Break"; "No school - Disney" → "Disney".
+    const reason = e => {
+      const t = e.title.replace(/^🏫\s*/, '').trim();
+      const rest = t.match(/^(no school|home day)\b[\s:,–—-]*(.*)$/i);
+      return (rest ? rest[2] : t.split(/\s[-–—]\s/)[0]).trim().slice(0, 28);
+    };
+    const home = evs.find(e => /\bno school\b|\bhome day\b|\bschools? (are )?closed\b/i.test(e.title) ||
+      (fromSchool(e) && /\b(break|holiday|closed)\b/i.test(e.title)));
+    if (home) return { kind: 'home', why: reason(home) };
+    const virtual = evs.find(e => fromSchool(e) && /\bvirtual\b/i.test(e.title));
+    if (virtual) return { kind: 'virtual', why: '' };
+    if (day.getDay() === 0 || day.getDay() === 6) return { kind: 'home', why: 'Weekend' };
+    const short = evs.find(e => fromSchool(e) && /early (release|dismissal)|half[- ]day/i.test(e.title));
+    return { kind: 'school', why: short ? 'Short day' : '' };
+  }
+  const KID = {
+    school: { icon: '🏫', word: 'School day', say: "It's a school day!" },
+    home: { icon: '🏠', word: 'Home day', say: "It's a home day. No school!" },
+    virtual: { icon: '💻', word: 'School at home', say: "It's school at home, on the computer." }
+  };
+  // "Today is Friday. It's a school day!" / "On Monday, it's a home day. No school! It's Fall Break."
+  function sayDay(day, rel) {
+    const t = dayType(day), k = KID[t.kind], wd = day.toLocaleDateString([], { weekday: 'long' });
+    const extra = t.why === 'Short day' ? " It's a short day." : t.why && t.why !== 'Weekend' ? ` It's ${t.why}.` : '';
+    return (rel ? `${rel} is ${wd}. ${k.say}` : `On ${wd}, ${k.say[0].toLowerCase()}${k.say.slice(1)}`) + extra;
+  }
+  // Read aloud, like his morning routine app.
+  function speakKid(text) {
+    try {
+      const synth = window.speechSynthesis;
+      if (!synth) return;
+      synth.cancel();
+      const u = new SpeechSynthesisUtterance(text);
+      const v = synth.getVoices().find(v => /en[-_]US/i.test(v.lang) && /natural|google|samantha/i.test(v.name)) || synth.getVoices().find(v => /^en/i.test(v.lang));
+      if (v) u.voice = v;
+      u.rate = 0.92;
+      synth.speak(u);
+    } catch {}
+  }
+  function renderKid() {
+    const today = startOfDay(new Date()), t = dayType(today), k = KID[t.kind];
+    const week = Array.from({ length: 7 }, (_, i) => addDays(today, i + 1));
+    $('#kid-body').innerHTML = `
+      <button class="kid-today ${t.kind}" data-say="0">
+        <div class="kid-day">Today · ${today.toLocaleDateString([], { weekday: 'long' })}</div>
+        <div class="kid-icon" aria-hidden="true">${k.icon}</div>
+        <div class="kid-word">${k.word}</div>
+        ${t.why && t.why !== 'Weekend' ? `<div class="kid-why">${esc(t.why)}</div>` : ''}
+      </button>
+      <div class="kid-week">${week.map((d, i) => { const w = dayType(d); return `
+        <button class="kid-mini ${w.kind}" data-say="${i + 1}">
+          <b>${d.toLocaleDateString([], { weekday: 'short' })}</b>
+          <span aria-hidden="true">${KID[w.kind].icon}</span>
+          <small>${w.kind === 'school' ? 'School' : w.kind === 'virtual' ? 'Computer' : 'Home'}</small>
+        </button>`; }).join('')}</div>
+      <div class="kid-hint">Tap a picture to hear it</div>`;
+  }
+  let kidOpenedAt = 0;
+  function openKid() {
+    kidOpenedAt = Date.now();
+    renderKid();
+    $('#kid').hidden = false;
+    speakKid(sayDay(startOfDay(new Date()), 'Today'));
+  }
+  function closeKid() { $('#kid').hidden = true; try { speechSynthesis.cancel(); } catch {} }
+  function renderKidButton() { $('#btn-kid').textContent = cfg.kidName ? `🧒 ${cfg.kidName}` : ''; }
 
   // Keeps the tablet's screen from sleeping while the hub is open.
   let wakeLock = null;
@@ -1369,6 +1503,7 @@
         <label class="field">…and wakes at<select id="s-nt">${hours(draft.nightTo)}</select></label>
         <label class="field">Work day starts<select id="s-wf">${hours(draft.workFrom)}</select></label>
         <label class="field">…and ends<select id="s-wt">${hours(draft.workTo)}</select></label>
+        <label class="field">Child's name (for the kid view button; blank hides it)<input id="s-kid" value="${esc(draft.kidName)}" maxlength="20" autocomplete="off"></label>
         <label class="field">Dinner weeks start on<select id="s-ws">${['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map((d, i) => `<option value="${i}"${+draft.weekStart === i ? ' selected' : ''}>${d}</option>`).join('')}</select></label>
       </div>
       <h3>Lock settings</h3>
@@ -1398,6 +1533,7 @@
     draft.workFrom = +$('#s-wf').value;
     draft.workTo = +$('#s-wt').value;
     draft.weekStart = +$('#s-ws').value;
+    draft.kidName = $('#s-kid').value.trim();
     draft.nightFrom = +$('#s-nf').value;
     draft.nightTo = +$('#s-nt').value;
   }
@@ -1465,6 +1601,8 @@
   document.addEventListener('click', async e => {
     const t = e.target;
     if (t.id === 'modal') { closeSheet(); return; }
+    const say = t.closest('[data-say]');
+    if (say) { const i = +say.dataset.say; speakKid(sayDay(addDays(startOfDay(new Date()), i), ['Today', 'Tomorrow'][i])); return; }
     const wk = t.closest('[data-week]');
     if (wk) { openPlanner(+wk.dataset.week); return; }
     const cart = t.closest('[data-cart]');
@@ -1494,6 +1632,8 @@
     if (!act) return;
     if (act === 'settings') openSettings();
     if (act === 'close') closeSheet();
+    if (act === 'kid') openKid();
+    if (act === 'kid-close') closeKid();
     if (act === 'paste-setup') openPasteSetup();
     if (act === 'planner') openPlanner();
     if (act === 'import') openImport();
