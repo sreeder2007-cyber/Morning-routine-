@@ -108,8 +108,12 @@ function doPost(e) {
       catch (err) { return json_({ error: String(err.message || err) }); }
     }
     if (body.action === 'addEvent') {
-      try { addEvent_(body); } catch (err) { return json_({ error: String(err.message || err) }); }
-      return json_({ ok: true, calendar: calendar_() });
+      let added;
+      try { added = addEvent_(body); } catch (err) { return json_({ error: String(err.message || err) }); }
+      const warning = added.workSkipped
+        ? 'Added, but the work invites weren\'t sent. To send them, turn on the Google Calendar API in the script (Services → + → Google Calendar API) and publish a new version.'
+        : '';
+      return json_({ ok: true, calendar: calendar_(), warning: warning });
     }
     if (body.action === 'upload') {
       const bytes = Utilities.base64Decode(String(body.data || ''));
@@ -367,9 +371,11 @@ function icloudPhotos_(link) {
   return urls;
 }
 
-// An event typed on the hub. Created through the Calendar API rather than CalendarApp so it can
-// be marked private and so invites go only to work addresses (Outlook and other non-Google
-// calendars) while family Gmail guests just get it on their calendar without an email.
+// An event typed on the hub. Two ways to create it:
+//  • With the Google Calendar API turned on (script editor → Services → + → Google Calendar API):
+//    work addresses get an optional invite by email, family Gmail guests get the event quietly.
+//  • Without it, Google's basic calendar tools: the event is still created (private during work
+//    hours, family added quietly), but work calendars can't be invited, and the hub says so.
 function addEvent_(ev) {
   const cal = CalendarApp.getDefaultCalendar();
   const tz = cal.getTimeZone();
@@ -377,42 +383,55 @@ function addEvent_(ev) {
   if (!title || !/^\d{4}-\d{2}-\d{2}$/.test(ev.date)) throw new Error('bad event');
   const isTime = function (t) { return /^\d{2}:\d{2}$/.test(t || ''); };
   const isEmail = function (g) { return /^[^\s@,]+@[^\s@,]+\.[^\s@,]+$/.test(g); };
+  const family = (ev.guests || []).filter(isEmail);
+  const work = (ev.workGuests || []).filter(isEmail);
+  const location = String(ev.location || '').slice(0, 200);
 
-  const body = { summary: title };
-  if (ev.location) body.location = String(ev.location).slice(0, 200);
-  if (ev.private) body.visibility = 'private';
-  // Family members are regular guests; work addresses are optional, so the invite reads as
-  // an FYI hold on the work calendar rather than a meeting to accept.
-  const attendees = (ev.guests || []).filter(isEmail).map(function (g) { return { email: g }; })
-    .concat((ev.workGuests || []).filter(isEmail).map(function (g) { return { email: g, optional: true }; }));
-  if (attendees.length) body.attendees = attendees;
+  // No end (or one before the start): an hour long, stopping at midnight.
+  const oneHour = function (t) {
+    const m = Math.min(+t.slice(0, 2) * 60 + +t.slice(3) + 60, 23 * 60 + 59);
+    return ('0' + Math.floor(m / 60)).slice(-2) + ':' + ('0' + m % 60).slice(-2);
+  };
+  const timed = isTime(ev.start);
+  const endTime = timed ? (isTime(ev.end) && ev.end > ev.start ? ev.end : oneHour(ev.start)) : '';
 
-  if (isTime(ev.start)) {
-    // No end (or one before the start): an hour long, stopping at midnight.
-    const oneHour = function (t) {
-      const m = Math.min(+t.slice(0, 2) * 60 + +t.slice(3) + 60, 23 * 60 + 59);
-      return ('0' + Math.floor(m / 60)).slice(-2) + ':' + ('0' + m % 60).slice(-2);
-    };
-    const end = isTime(ev.end) && ev.end > ev.start ? ev.end : oneHour(ev.start);
-    body.start = { dateTime: ev.date + 'T' + ev.start + ':00', timeZone: tz };
-    body.end = { dateTime: ev.date + 'T' + end + ':00', timeZone: tz };
+  let apiError = '';
+  if (typeof Calendar !== 'undefined' && Calendar.Events) {
+    const body = { summary: title };
+    if (location) body.location = location;
+    if (ev.private) body.visibility = 'private';
+    const attendees = family.map(function (g) { return { email: g }; })
+      .concat(work.map(function (g) { return { email: g, optional: true }; }));
+    if (attendees.length) body.attendees = attendees;
+    if (timed) {
+      body.start = { dateTime: ev.date + 'T' + ev.start + ':00', timeZone: tz };
+      body.end = { dateTime: ev.date + 'T' + endTime + ':00', timeZone: tz };
+    } else {
+      const next = new Date(Utilities.parseDate(ev.date, 'UTC', 'yyyy-MM-dd').getTime() + 864e5);
+      body.start = { date: ev.date };
+      body.end = { date: Utilities.formatDate(next, 'UTC', 'yyyy-MM-dd') };
+    }
+    try {
+      Calendar.Events.insert(body, 'primary', { sendUpdates: 'externalOnly' });
+      return { workInvited: work.length > 0, workSkipped: false };
+    } catch (err) {
+      apiError = String(err.message || err);   // fall through to the basic tools below
+    }
+  }
+
+  const opts = { location: location };
+  if (family.length) { opts.guests = family.join(','); opts.sendInvites = false; }
+  let created;
+  if (timed) {
+    created = cal.createEvent(title,
+      Utilities.parseDate(ev.date + ' ' + ev.start, tz, 'yyyy-MM-dd HH:mm'),
+      Utilities.parseDate(ev.date + ' ' + endTime, tz, 'yyyy-MM-dd HH:mm'), opts);
   } else {
-    const next = new Date(Utilities.parseDate(ev.date, 'UTC', 'yyyy-MM-dd').getTime() + 864e5);
-    body.start = { date: ev.date };
-    body.end = { date: Utilities.formatDate(next, 'UTC', 'yyyy-MM-dd') };
+    // Noon keeps the calendar date right even if the script's time zone differs from the calendar's.
+    created = cal.createAllDayEvent(title, new Date(Utilities.parseDate(ev.date, tz, 'yyyy-MM-dd').getTime() + 12 * 3600e3), opts);
   }
-
-  const res = UrlFetchApp.fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events?sendUpdates=externalOnly', {
-    method: 'post',
-    contentType: 'application/json',
-    headers: { Authorization: 'Bearer ' + ScriptApp.getOAuthToken() },
-    payload: JSON.stringify(body),
-    muteHttpExceptions: true
-  });
-  if (res.getResponseCode() !== 200) {
-    const err = JSON.parse(res.getContentText() || '{}').error;
-    throw new Error('Calendar: ' + ((err && err.message) || res.getResponseCode()));
-  }
+  if (ev.private) created.setVisibility(CalendarApp.Visibility.PRIVATE);
+  return { workInvited: false, workSkipped: work.length > 0, apiError: apiError };
 }
 
 /* ── Meal plan ──

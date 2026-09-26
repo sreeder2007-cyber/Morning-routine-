@@ -116,6 +116,11 @@ events are left alone.
 The 3-day view (the default) also shows each day's forecast and that night's dinner from
 the meals note. Switch to 5 or 7 days in Settings for more days at a glance.
 
+**Work invites need one switch:** in the script editor, open **Services** (left side) → **+** →
+**Google Calendar API** → **Add**, then publish a new version. Without it, events are still added,
+private during work hours and on the family's calendars, but work calendars aren't invited, and
+the hub says so when that happens.
+
 If you set up the script before this feature existed, paste in the latest `hub-script.gs`,
 run **setup** once to allow the new permission (it adds events through the Calendar API), and
 publish a new version (**Deploy → Manage deployments → ✏️ → New version**).

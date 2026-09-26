@@ -361,7 +361,8 @@
   #toast {
     position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%); z-index: 80;
     background: var(--ink); color: #fff; padding: 12px 20px; border-radius: 14px; font-weight: 700;
-    box-shadow: var(--shadow);
+    box-shadow: var(--shadow); width: max-content; max-width: min(640px, calc(100vw - 32px));
+    text-align: center; line-height: 1.35; overflow-wrap: anywhere; cursor: pointer;
   }
 
   /* ── Portrait tablets and phones: stack and scroll ── */
@@ -504,9 +505,17 @@
     const h = Math.round(m / 60);
     return h < 24 ? `${h}h ago` : `${Math.round(h / 24)}d ago`;
   };
+  // Longer messages stay up longer (tap to dismiss), so they can actually be read.
   function toast(msg) {
     const t = $('#toast'); t.textContent = msg; t.hidden = false;
-    clearTimeout(toast.t); toast.t = setTimeout(() => { t.hidden = true; }, 3500);
+    t.onclick = () => { t.hidden = true; };
+    clearTimeout(toast.t); toast.t = setTimeout(() => { t.hidden = true; }, Math.min(15000, 3500 + msg.length * 45));
+  }
+  // Turns Google's long error texts into something a person can act on.
+  function friendlyError(msg) {
+    if (msg === 'unknown action') return 'Update the Google script to the latest version first (see README).';
+    if (/has not been used|is disabled|accessNotConfigured/i.test(msg)) return 'The Google Calendar API is off in the script. Update to the latest hub-script.gs (it works without it), or turn it on: Services → + → Google Calendar API.';
+    return msg.length > 200 ? msg.slice(0, 200) + '…' : msg;
   }
 
   /* ── Members & Apps Script calls ── */
@@ -1534,12 +1543,12 @@
         (data[who.id] || (data[who.id] = {})).calendar = j.calendar;
         save(K_DATA, data);
         closeSheet(); render();
-        toast(`Added to ${who.name}'s calendar`);
+        toast(j.warning || `Added to ${who.name}'s calendar`);
         // Guests' copies show up on their own calendars; pick them up on the next refresh.
         if (ev.guests.length) setTimeout(() => refreshAll(), 8000);
       } catch (err) {
         btn.disabled = false; btn.textContent = 'Add';
-        toast(err.message === 'unknown action' ? 'Update the Google script to the latest version first (see README).' : `Couldn't add it (${err.message}).`);
+        toast(`Couldn't add it. ${friendlyError(err.message)}`);
       }
     });
   }
