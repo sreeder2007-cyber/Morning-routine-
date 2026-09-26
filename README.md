@@ -224,12 +224,30 @@ tag. If the note has no day names, the hub shows the whole thing.
 
 ### 3. Photos (optional)
 
-Make a Google Drive folder (e.g. "Family Hub Photos") and drop pictures in. Google Photos
-can't be used because it no longer lets outside apps read your library. Share the folder as
-**Anyone with the link → Viewer**, so the tablet can show the images without being signed
-in. Then copy the ID from the folder's address (`drive.google.com/drive/folders/THIS_PART`)
-into `PHOTO_FOLDER_ID` and publish a new version. Only one of you needs to do this, and if
-you both do, both folders show up. New photos appear within the hour.
+**iCloud Shared Album (easiest for iPhones).** Anyone in the album adds pictures from their
+phone as usual, and they show on the hub's photo frame within the hour.
+
+1. On an iPhone, in **Photos**, open the shared album (or create one under **Albums → + → New
+   Shared Album**).
+2. Tap the **People** icon, turn on **Public Website**, and tap **Share Link** → **Copy**.
+3. On the hub: **⚙️ → your name → Photo album**, paste the link, and tap **Use album**. It
+   reads the album right away and tells you how many photos it found, or what's wrong. The link
+   is saved in your Google script, not on the tablet, and nobody has to edit the script.
+
+Videos are skipped. With Public Website on, anyone who has the album link can see the photos,
+the same as a Drive folder shared by link. The link is only in your script, never in this
+repository. The hub reads the album the way Apple's album web page does. Apple doesn't
+document that, so if Apple ever changes it, the Drive option below still works.
+
+**Google Drive folder.** Put pictures in a Drive folder, share it as **Anyone with the link →
+Viewer**, and paste its link into **Photo album** in Settings the same way (the folder's link works as-is). Google Photos can't be
+used, because it no longer lets outside apps read your library.
+
+Each script holds one album or folder at a time. Leave the box blank and tap **Use album** to
+turn photos off. `ICLOUD_ALBUM` and `PHOTO_FOLDER_ID` at the top of the script still work if
+you'd rather type the link there, but Settings takes priority.
+
+If both of you set an album in your own scripts, the frame mixes them.
 
 ### 4. The tablet
 

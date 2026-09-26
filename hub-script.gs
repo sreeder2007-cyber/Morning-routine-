@@ -6,7 +6,7 @@
  * nobody shares a password and nothing is stored anywhere but their own Google account.
  *
  * Setup (once per person — full walkthrough in README.md):
- *   1. Paste this file, then fill in PHOTO_FOLDER_ID below if you want photos (optional).
+ *   1. Paste this file. (Photos are set later from the hub's Settings; nothing to edit here.)
  *   2. Run `setup` from the toolbar, allow the permissions, and copy the key from the log.
  *   3. Deploy → New deployment → Web app. Execute as: Me. Who has access: Anyone.
  *   4. Put the /exec URL and the key into the hub's Settings.
@@ -19,10 +19,19 @@
  * APS email) and puts the dates on the calendar — see README.md.
  */
 
+// Photos are normally set from the hub: Settings → your name → Photo album. The two values
+// below are only a fallback if you'd rather type them here.
+//
 // Optional: the ID of a Google Drive folder of family photos (the part of the folder's URL
 // after /folders/). Share that folder as "Anyone with the link can view" so the tablet can
 // load the images. Leave empty for no photos.
 const PHOTO_FOLDER_ID = '';
+
+// Optional: an iCloud Shared Album for the photo frame. In the Photos app on an iPhone, open the
+// shared album → People (the person icon) → turn on Public Website → Share Link, and paste that
+// link here, e.g. 'https://www.icloud.com/sharedalbum/#B0aBcDeFgHiJkL'. Anyone in the album can
+// add pictures from their phone and they appear on the hub within the hour. Videos are skipped.
+const ICLOUD_ALBUM = '';
 
 // Calendars to show. Empty means every calendar that's checked in your Google Calendar
 // sidebar (yours, shared family calendars, holidays, birthdays). Otherwise list IDs from
@@ -49,6 +58,7 @@ function setup() {
   }
   CalendarApp.getDefaultCalendar();
   if (PHOTO_FOLDER_ID) DriveApp.getFolderById(PHOTO_FOLDER_ID).getName();
+  DriveApp.getRootFolder();
   inboxFolder_();
   Logger.log('Your hub key: ' + key);
 }
@@ -92,6 +102,10 @@ function doPost(e) {
       const text = String(body.text || '').slice(0, 8000);
       PROPS.setProperty('MEALS', JSON.stringify({ text: text, at: new Date().toISOString() }));
       return json_({ ok: true, meals: meals_() });
+    }
+    if (body.action === 'photoSource') {
+      try { return json_(Object.assign({ ok: true }, setPhotoSource_(body.link))); }
+      catch (err) { return json_({ error: String(err.message || err) }); }
     }
     if (body.action === 'addEvent') {
       try { addEvent_(body); } catch (err) { return json_({ error: String(err.message || err) }); }
@@ -196,19 +210,107 @@ function applyListOp_(list, op) {
   return list.slice(-LIST_MAX);
 }
 
+// The album chosen in the hub's Settings wins over the constants above.
+function photoSource_() {
+  return {
+    icloud: PROPS.getProperty('ICLOUD_ALBUM') || ICLOUD_ALBUM,
+    folder: PROPS.getProperty('PHOTO_FOLDER_ID') || PHOTO_FOLDER_ID
+  };
+}
+
 function photos_() {
-  if (!PHOTO_FOLDER_ID) return [];
+  const src = photoSource_();
+  let out = [];
+  if (src.folder) out = out.concat(drivePhotos_(src.folder));
+  if (src.icloud) out = out.concat(icloudPhotos_(src.icloud));
+  return out;
+}
+
+// Set from the hub: an iCloud Shared Album link, a Google Drive folder link, or blank to turn
+// photos off. The new album is read once straight away so a bad link is reported, not saved.
+function setPhotoSource_(link) {
+  link = String(link || '').trim();
+  const folder = link.match(/drive\.google\.com\/(?:drive\/(?:u\/\d+\/)?folders\/|open\?id=)([\w-]{10,})/);
+  CacheService.getScriptCache().remove('photos');
+  if (!link) {
+    PROPS.deleteProperty('ICLOUD_ALBUM');
+    PROPS.deleteProperty('PHOTO_FOLDER_ID');
+    return { kind: 'none', count: 0 };
+  }
+  if (/icloud\.com\/sharedalbum\/#[A-Za-z0-9]{10,}/.test(link)) {
+    const count = icloudPhotos_(link).length;
+    PROPS.setProperty('ICLOUD_ALBUM', link);
+    PROPS.deleteProperty('PHOTO_FOLDER_ID');
+    return { kind: 'icloud', count: count };
+  }
+  if (folder) {
+    const count = drivePhotos_(folder[1]).length;
+    PROPS.setProperty('PHOTO_FOLDER_ID', folder[1]);
+    PROPS.deleteProperty('ICLOUD_ALBUM');
+    return { kind: 'drive', count: count };
+  }
+  throw new Error('That isn\'t an iCloud Shared Album link (…icloud.com/sharedalbum/#…) or a Google Drive folder link');
+}
+
+function drivePhotos_(folderId) {
   const cache = CacheService.getScriptCache();
   const hit = cache.get('photos');
   if (hit) return JSON.parse(hit);
   const ids = [];
-  const files = DriveApp.getFolderById(PHOTO_FOLDER_ID).getFiles();
+  const files = DriveApp.getFolderById(folderId).getFiles();
   while (files.hasNext() && ids.length < 1000) {
     const f = files.next();
     if (/^image\//.test(f.getMimeType())) ids.push(f.getId());
   }
   cache.put('photos', JSON.stringify(ids), 3600);
   return ids;
+}
+
+// Reads a public iCloud Shared Album the way Apple's own album web page does. Apple doesn't
+// document these two calls, so if Apple changes them this is the place to look. Returns
+// full-size image links; Apple signs them for a limited time, so the hub re-asks regularly.
+function icloudPhotos_(link) {
+  const token = String(link).split('#').pop().split(';')[0].trim();
+  if (!/^[A-Za-z0-9]{10,}$/.test(token)) throw new Error('ICLOUD_ALBUM should be the album link ending in #B0…');
+  let host = 'p23-sharedstreams.icloud.com';
+  const call = function (path, body) {
+    for (let tries = 0; tries < 3; tries++) {
+      const res = UrlFetchApp.fetch('https://' + host + '/' + token + '/sharedstreams/' + path, {
+        method: 'post', contentType: 'text/plain', payload: JSON.stringify(body), muteHttpExceptions: true
+      });
+      const code = res.getResponseCode();
+      // Albums live on different Apple servers; the first answer names the right one.
+      if (code === 330) { host = JSON.parse(res.getContentText())['X-Apple-MMe-Host'] || host; continue; }
+      if (code === 404) throw new Error('iCloud album not found. Is Public Website turned on for it?');
+      if (code !== 200) throw new Error('iCloud album: HTTP ' + code);
+      return JSON.parse(res.getContentText());
+    }
+    throw new Error('iCloud album: too many redirects');
+  };
+
+  const stream = call('webstream', { streamCtag: null });
+  const picks = [];
+  (stream.photos || []).forEach(function (p) {
+    if (p.mediaAssetType === 'video') return;
+    // Each photo comes in several sizes; take the biggest one up to 2560px wide.
+    const sizes = Object.keys(p.derivatives || {}).map(function (k) { return p.derivatives[k]; })
+      .filter(function (d) { return d && d.checksum && +d.width; })
+      .sort(function (a, b) { return +a.width - +b.width; });
+    const fit = sizes.filter(function (d) { return +d.width <= 2560; });
+    const pick = fit.length ? fit[fit.length - 1] : sizes[0];
+    if (pick) picks.push({ guid: p.photoGuid, checksum: pick.checksum });
+  });
+
+  const urls = [];
+  for (let i = 0; i < picks.length && i < 500; i += 25) {
+    const batch = picks.slice(i, i + 25);
+    const assets = call('webasseturls', { photoGuids: batch.map(function (b) { return b.guid; }) });
+    batch.forEach(function (b) {
+      const item = assets.items && assets.items[b.checksum];
+      if (item && item.url_location && item.url_path) urls.push('https://' + item.url_location + item.url_path);
+    });
+  }
+  return urls;
 }
 
 // An event typed on the hub. Created through the Calendar API rather than CalendarApp so it can
