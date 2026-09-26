@@ -98,6 +98,20 @@ version**. The URL stays the same.
 Only calendars that are checked in your Google Calendar sidebar show up. To pick specific
 ones, list their IDs in `CALENDAR_IDS`.
 
+### Adding events from the hub
+
+Each day on the calendar has a **+ Add** button. Type what it is, pick the day, and add
+times (or leave them empty for all day), a place, and whose calendar it goes on. It's saved
+straight to that person's Google Calendar and appears on the hub right away. Tick **Invite
+everyone else** to put it on the others' calendars too; that needs each person's Google
+email filled in under ⚙️ Settings, and no invite email is sent.
+
+The 3-day view (the default) also shows each day's forecast and that night's dinner from
+the meals note. Switch to 5 or 7 days in Settings for more days at a glance.
+
+If you set up the script before this feature existed, paste in the latest `hub-script.gs`
+and publish a new version (**Deploy → Manage deployments → ✏️ → New version**).
+
 ### 1b. School dates from APS email and photos (automatic)
 
 A scheduled Claude task runs twice a day, at 6:47am and 5:47pm Albuquerque time, on Scott's

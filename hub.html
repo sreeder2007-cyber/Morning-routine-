@@ -88,16 +88,25 @@
   .ev.allday .n { font-weight: 800; }
   .ev.past { opacity: .5; }
   /* Three wide columns: large enough to read from across the kitchen. */
-  .week.d3 { gap: 14px; }
-  .week.d3 .day h3 { padding: 16px 18px 12px; font-size: 18px; }
-  .week.d3 .day h3 b { font-size: 42px; }
-  .week.d3 .evs { padding: 0 14px 16px; gap: 10px; }
-  .week.d3 .ev { font-size: 24px; padding: 10px 14px 12px; border-left-width: 8px; border-radius: 14px; }
-  .week.d3 .ev .t { font-size: 18px; }
-  .week.d3 .ev .loc { display: block; font-size: 16px; font-weight: 600; color: #5e544c; margin-top: 2px; }
-  .week.d3 .dots i { width: 12px; height: 12px; }
-  .week.d3 .empty-day { font-size: 19px; padding: 4px 6px; }
   .ev .loc { display: none; }
+  .week.d3 .ev .loc { display: block; font-size: 15px; font-weight: 600; color: #5e544c; margin-top: 2px; }
+  .day-head { display: flex; align-items: flex-start; gap: 8px; padding: 14px 14px 10px; }
+  .day-head h3 { padding: 0; flex: 1; min-width: 0; }
+  .day-wx { text-align: right; font-weight: 800; font-size: 17px; line-height: 1.15; white-space: nowrap; }
+  .day-wx .ic { font-size: 26px; display: block; }
+  .day-wx small { font-size: 14px; color: var(--muted); }
+  .day-dinner {
+    margin: 0 10px 10px; padding: 8px 12px; border-radius: 12px; background: #fdf1e8;
+    font-size: 16px; font-weight: 700; line-height: 1.3; color: #5a3a2a;
+  }
+  .day-dinner b { display: block; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: #c0613f; }
+  .add-ev {
+    display: block; width: 100%; margin-top: 2px; border: 2px dashed var(--line); background: none;
+    border-radius: 12px; padding: 9px; font-size: 16px; font-weight: 800; color: var(--muted);
+  }
+  .week.d7 .day-head { padding: 12px 10px 8px; }
+  .week.d7 .day-wx, .week.d7 .day-dinner { display: none; }
+  .week.d7 .add-ev { font-size: 14px; padding: 6px; }
   /* Seven columns only fit at the old, smaller size. */
   .week.d7 { gap: 10px; }
   .week.d7 .day h3 { padding: 12px 10px 8px; font-size: 12px; }
@@ -331,7 +340,7 @@
   }
 
   /* ── Members & Apps Script calls ── */
-  const DEMO_MEMBERS = [{ id: 'demo-a', name: 'Dad', color: COLORS[1] }, { id: 'demo-b', name: 'Mom', color: COLORS[0] }];
+  const DEMO_MEMBERS = [{ id: 'demo-a', name: 'Dad', color: COLORS[1], email: 'dad@example.com' }, { id: 'demo-b', name: 'Mom', color: COLORS[0], email: 'mom@example.com' }];
   const demoOn = () => cfg.demo && !cfg.members.length;
   const members = () => demoOn() ? DEMO_MEMBERS : cfg.members;
   const connected = () => cfg.members.filter(m => m.url && m.key);
@@ -478,7 +487,12 @@
         return `<button class="ev${state}" style="--c:${c}" data-ev="${idx}"><div class="t">${time}${dots}</div><div class="n">${esc(ev.title)}</div>${loc}</button>`;
       };
       const body = allDay.length + timed.length ? allDay.map(chip).join('') + timed.map(chip).join('') : '<div class="empty-day">Nothing planned</div>';
-      html += `<div class="day${i === 0 ? ' today' : ''}"><h3>${label}<b>${esc(big)}</b></h3><div class="evs">${body}</div></div>`;
+      const w = wx?.days?.find(d => d.t === dayKey(day));
+      const wxHtml = w ? `<div class="day-wx"><span class="ic">${WX(w.c)}</span>${w.hi}° <small>${w.lo}°</small></div>` : '';
+      const dinner = days === 3 ? dinnerOn(day) : '';
+      const dinnerHtml = dinner ? `<div class="day-dinner"><b>Dinner</b>${esc(dinner)}</div>` : '';
+      html += `<div class="day${i === 0 ? ' today' : ''}"><div class="day-head"><h3>${label}<b>${esc(big)}</b></h3>${wxHtml}</div>${dinnerHtml}
+        <div class="evs">${body}<button class="add-ev" data-add="${dayKey(day)}">+ Add</button></div></div>`;
     }
     week.innerHTML = html;
   }
@@ -534,11 +548,23 @@
     const lbl = { b: 'Breakfast', l: 'Lunch', d: 'Dinner' }[m[1].toLowerCase()] || m[1];
     return `<div class="meal"><span class="lbl">${esc(lbl)}</span><span>${esc(m[2])}</span></div>`;
   }
-  function renderMeals() {
-    const el = $('#meals');
+  function latestMealNote() {
     const notes = members().map(m => view()[m.id]?.meals).filter(x => x && x.text);
     notes.sort((a, b) => new Date(b.at) - new Date(a.at));
-    const note = notes[0];
+    return notes[0] || null;
+  }
+  // That day's dinner (or the whole day's meals if nothing is labeled dinner).
+  function dinnerOn(day) {
+    const note = latestMealNote();
+    const items = note && parseMeals(note.text)?.[day.getDay()];
+    if (!items?.length) return '';
+    const d = items.find(x => /^(dinner|supper|d)\s*[:\-–—]/i.test(x));
+    return d ? d.replace(/^(dinner|supper|d)\s*[:\-–—]\s*/i, '') : items.join(' · ');
+  }
+
+  function renderMeals() {
+    const el = $('#meals');
+    const note = latestMealNote();
     if (!note) {
       el.innerHTML = `<h2>🍽️ Meals</h2><div class="hint">Nothing yet. Once the iPhone Shortcut runs, the meals note shows up here — see the README.</div>`;
       return;
@@ -627,6 +653,7 @@
   async function refreshWeather() {
     try { wx = await getWeather(); } catch { wx = load(K_WX, null); }
     renderWeather();
+    renderWeek();
   }
   function renderWeather() {
     const el = $('#wx');
@@ -806,6 +833,72 @@
     try { snap = await shrinkPhoto(f); renderSnap(); } catch (err) { toast(err.message); }
   });
 
+  /* ── Add an event from the hub ── */
+  function openAddEvent(date) {
+    const ms = demoOn() ? DEMO_MEMBERS : connected();
+    if (!ms.length) { toast('Connect your Google script in Settings first.'); return; }
+    const others = m => ms.filter(o => o !== m && o.email);
+    openSheet(`
+      <h2>Add to the calendar</h2>
+      <form id="add-form" style="display:grid;gap:14px;margin-top:14px">
+        <label class="field">What<input id="ae-title" required maxlength="200" placeholder="e.g. Dentist — Paul" autocomplete="off"></label>
+        <div class="grid2">
+          <label class="field">Day<input id="ae-date" type="date" value="${date}" required></label>
+          <label class="field">Starts<input id="ae-start" type="time"></label>
+          <label class="field">Ends<input id="ae-end" type="time"></label>
+        </div>
+        <div class="hint" style="margin-top:-6px">Leave the times empty for an all-day event.</div>
+        <label class="field">Where (optional)<input id="ae-loc" maxlength="200" autocomplete="off"></label>
+        ${ms.length > 1 ? `<label class="field">Whose calendar<select id="ae-who">${ms.map((m, i) => `<option value="${i}">${esc(m.name)}</option>`).join('')}</select></label>` : ''}
+        <label class="check" id="ae-invite-row"${others(ms[0]).length ? '' : ' hidden'}><input type="checkbox" id="ae-invite" checked> Invite everyone else, so it's on their calendar too</label>
+        <div class="actions" style="margin-top:4px">
+          <button type="button" class="btn ghost" data-act="close">Cancel</button>
+          <button class="btn" id="ae-save">Add</button>
+        </div>
+      </form>`);
+    $('#ae-who')?.addEventListener('change', e => { $('#ae-invite-row').hidden = !others(ms[+e.target.value]).length; });
+    setTimeout(() => $('#ae-title')?.focus(), 50);
+    $('#add-form').addEventListener('submit', async e => {
+      e.preventDefault();
+      const who = ms[+($('#ae-who')?.value || 0)];
+      const ev = {
+        action: 'addEvent',
+        title: $('#ae-title').value.trim(),
+        date: $('#ae-date').value,
+        start: $('#ae-start').value,
+        end: $('#ae-end').value,
+        location: $('#ae-loc').value.trim(),
+        guests: $('#ae-invite').checked ? others(who).map(o => o.email) : []
+      };
+      if (!ev.title || !ev.date) return;
+      if (demoOn()) { addDemoEvent(who, ev); closeSheet(); render(); toast('Added (sample data only)'); return; }
+      const btn = $('#ae-save');
+      btn.disabled = true; btn.textContent = 'Adding…';
+      try {
+        const j = await postScript(who, ev);
+        (data[who.id] || (data[who.id] = {})).calendar = j.calendar;
+        save(K_DATA, data);
+        closeSheet(); render();
+        toast(`Added to ${who.name}'s calendar`);
+        // Guests' copies show up on their own calendars; pick them up on the next refresh.
+        if (ev.guests.length) setTimeout(() => refreshAll(), 8000);
+      } catch (err) {
+        btn.disabled = false; btn.textContent = 'Add';
+        toast(err.message === 'unknown action' ? 'Update the Google script to the latest version first (see README).' : `Couldn't add it (${err.message}).`);
+      }
+    });
+  }
+  function addDemoEvent(who, ev) {
+    const d = parseDay(ev.date);
+    const at = t => { const [h, m] = t.split(':').map(Number); const x = new Date(d); x.setHours(h, m); return x; };
+    const start = ev.start ? at(ev.start) : null;
+    const end = ev.start ? (ev.end && at(ev.end) > start ? at(ev.end) : new Date(start.getTime() + 3600e3)) : null;
+    const out = { id: uid(), title: ev.title, location: ev.location, calendar: 'Family', allDay: !ev.start,
+      start: ev.start ? start.toISOString() : ev.date, end: ev.start ? end.toISOString() : dayKey(addDays(d, 1)) };
+    demo[who.id].calendar.push(out);
+    if (ev.guests.length) DEMO_MEMBERS.filter(m => m !== who).forEach(m => demo[m.id].calendar.push(out));
+  }
+
   /* ── Sheets: settings, event details ── */
   function openSheet(html) { $('#sheet').innerHTML = html; $('#modal').hidden = false; }
   function closeSheet() { $('#modal').hidden = true; $('#sheet').innerHTML = ''; }
@@ -825,6 +918,7 @@
         </div>
         <label class="field">Script URL (ends in /exec)<input data-f="url" value="${esc(m.url)}" placeholder="https://script.google.com/macros/s/…/exec" inputmode="url"></label>
         <label class="field">Key<input data-f="key" value="${esc(m.key)}" placeholder="from the script's setup log"></label>
+        <label class="field">Google email (so others can invite them to events)<input data-f="email" value="${esc(m.email || '')}" placeholder="name@gmail.com" inputmode="email"></label>
         <div class="member-foot">
           <button type="button" class="btn ghost" data-act="test">Test connection</button>
           <span class="test-out"></span>
@@ -902,6 +996,8 @@
   document.addEventListener('click', async e => {
     const t = e.target;
     if (t.id === 'modal') { closeSheet(); return; }
+    const add = t.closest('[data-add]');
+    if (add) { openAddEvent(add.dataset.add); return; }
     const ev = t.closest('[data-ev]');
     if (ev) { showEvent(events[+ev.dataset.ev]); return; }
     const li = t.closest('[data-li]');
@@ -925,7 +1021,7 @@
     if (act === 'add-member') {
       readSettingsForm();
       const used = draft.members.map(m => m.color);
-      draft.members.push({ id: uid(), name: '', color: COLORS.find(c => !used.includes(c)) || COLORS[0], url: '', key: '' });
+      draft.members.push({ id: uid(), name: '', color: COLORS.find(c => !used.includes(c)) || COLORS[0], url: '', key: '', email: '' });
       renderSettings();
     }
     if (act === 'remove') {

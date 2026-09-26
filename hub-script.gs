@@ -81,6 +81,10 @@ function doPost(e) {
       PROPS.setProperty('MEALS', JSON.stringify({ text: text, at: new Date().toISOString() }));
       return json_({ ok: true, meals: meals_() });
     }
+    if (body.action === 'addEvent') {
+      try { addEvent_(body); } catch (err) { return json_({ error: String(err.message || err) }); }
+      return json_({ ok: true, calendar: calendar_() });
+    }
     if (body.action === 'upload') {
       const bytes = Utilities.base64Decode(String(body.data || ''));
       if (!bytes.length || bytes.length > 15 * 1024 * 1024) return json_({ error: 'bad photo' });
@@ -182,6 +186,31 @@ function photos_() {
   }
   cache.put('photos', JSON.stringify(ids), 3600);
   return ids;
+}
+
+// An event typed on the hub. Times are read in the calendar's own time zone.
+function addEvent_(ev) {
+  const cal = CalendarApp.getDefaultCalendar();
+  const tz = cal.getTimeZone();
+  const title = String(ev.title || '').trim().slice(0, 200);
+  if (!title || !/^\d{4}-\d{2}-\d{2}$/.test(ev.date)) throw new Error('bad event');
+  const isTime = function (t) { return /^\d{2}:\d{2}$/.test(t || ''); };
+
+  const opts = {};
+  if (ev.location) opts.location = String(ev.location).slice(0, 200);
+  const guests = (ev.guests || []).filter(function (g) { return /^[^\s@,]+@[^\s@,]+\.[^\s@,]+$/.test(g); });
+  if (guests.length) { opts.guests = guests.join(','); opts.sendInvites = false; }
+
+  if (isTime(ev.start)) {
+    const start = Utilities.parseDate(ev.date + ' ' + ev.start, tz, 'yyyy-MM-dd HH:mm');
+    let end = isTime(ev.end) ? Utilities.parseDate(ev.date + ' ' + ev.end, tz, 'yyyy-MM-dd HH:mm') : null;
+    if (!end || end <= start) end = new Date(start.getTime() + 60 * 60000);
+    cal.createEvent(title, start, end, opts);
+  } else {
+    // Noon keeps the calendar date right even if the script's time zone differs from the calendar's.
+    const noon = new Date(Utilities.parseDate(ev.date, tz, 'yyyy-MM-dd').getTime() + 12 * 3600e3);
+    cal.createAllDayEvent(title, noon, opts);
+  }
 }
 
 function inboxFolder_() {
