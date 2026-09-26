@@ -51,6 +51,16 @@ function setup() {
   Logger.log('Your hub key: ' + key);
 }
 
+/**
+ * Run this if the tablet is lost or a setup link went somewhere it shouldn't. The old key
+ * stops working at once; put the new one into the hub's Settings.
+ */
+function newKey() {
+  const key = Utilities.getUuid().replace(/-/g, '') + Utilities.getUuid().replace(/-/g, '');
+  PROPS.setProperty('HUB_KEY', key);
+  Logger.log('Your new hub key: ' + key);
+}
+
 function doGet(e) {
   const p = (e && e.parameter) || {};
   if (!authorized_(p.key)) return json_({ error: 'bad key' });

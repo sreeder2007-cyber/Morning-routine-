@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#f4efe8">
 <meta name="mobile-web-app-capable" content="yes">
+<!-- Only the services the hub actually uses may be reached; no outside scripts, frames or plugins. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob: https://drive.google.com https://*.googleusercontent.com https://picsum.photos https://fastly.picsum.photos; connect-src https://script.google.com https://script.googleusercontent.com https://api.open-meteo.com https://geocoding-api.open-meteo.com; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'">
+<meta name="referrer" content="no-referrer">
 <title>Family Hub</title>
 <link rel="manifest" href="hub-manifest.json">
 <link rel="icon" href="hub-icon.svg" type="image/svg+xml">
@@ -310,7 +313,32 @@
   const DEFAULTS = { members: [], zip: '', idleMin: 10, photoSec: 20, days: 3, workFrom: 8, workTo: 17, nightFrom: 22, nightTo: 6, demo: false };
   const REFRESH_MS = 5 * 60 * 1000, PHOTO_REFRESH_MS = 60 * 60 * 1000, NIGHT_IDLE_MS = 2 * 60 * 1000;
 
-  let cfg = { ...DEFAULTS, ...load(K_CFG, {}) };
+  // Settings can arrive in a setup link someone texted, so treat every field as untrusted:
+  // colors go into inline styles and URLs get fetched, so only allow the expected shapes.
+  function cleanCfg(raw) {
+    const c = { ...DEFAULTS, ...(raw && typeof raw === 'object' ? raw : {}) };
+    const str = (v, n = 200) => typeof v === 'string' ? v.slice(0, n) : '';
+    const num = (v, lo, hi, d) => Number.isFinite(+v) && +v >= lo && +v <= hi ? +v : d;
+    c.members = (Array.isArray(c.members) ? c.members : []).slice(0, 8).map(m => ({
+      id: str(m?.id, 40).replace(/[^\w-]/g, '') || Math.random().toString(36).slice(2, 10),
+      name: str(m?.name, 40),
+      color: COLORS.includes(m?.color) ? m.color : COLORS[0],
+      url: /^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(m?.url || '') ? m.url : '',
+      key: str(m?.key, 100),
+      email: str(m?.email, 120),
+      workEmail: str(m?.workEmail, 120)
+    }));
+    c.zip = str(c.zip, 10).replace(/[^\w -]/g, '');
+    c.idleMin = num(c.idleMin, 0, 240, DEFAULTS.idleMin);
+    c.photoSec = num(c.photoSec, 5, 600, DEFAULTS.photoSec);
+    c.days = [3, 5, 7].includes(+c.days) ? +c.days : DEFAULTS.days;
+    for (const k of ['nightFrom', 'nightTo', 'workFrom', 'workTo']) c[k] = num(c[k], 0, 23, DEFAULTS[k]);
+    c.pinSalt = /^[0-9a-f]{32}$/.test(c.pinSalt || '') ? c.pinSalt : '';
+    c.pinHash = /^[0-9a-f]{64}$/.test(c.pinHash || '') && c.pinSalt ? c.pinHash : '';
+    c.demo = !!c.demo;
+    return c;
+  }
+  let cfg = cleanCfg(load(K_CFG, {}));
   let data = load(K_DATA, {});              // member id → { calendar, meals, list, photos, at, err }
   let events = [];                          // merged events currently on screen, for the detail sheet
 
@@ -924,9 +952,48 @@
   function closeSheet() { $('#modal').hidden = true; $('#sheet').innerHTML = ''; }
 
   let draft = null;
+  /* ── Settings PIN: the settings hold the keys to both Google scripts ── */
+  let unlockedUntil = 0, pinFails = 0, pinBlockedUntil = 0;
+  async function sha256(text) {
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+    return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+  const randomHex = n => [...crypto.getRandomValues(new Uint8Array(n))].map(b => b.toString(16).padStart(2, '0')).join('');
+
   function openSettings() {
+    if (cfg.pinHash && Date.now() > unlockedUntil) { askPin(); return; }
     draft = JSON.parse(JSON.stringify(cfg));
     renderSettings();
+  }
+  function askPin() {
+    openSheet(`
+      <h2>Enter PIN</h2>
+      <div class="hint">Settings are locked because they hold the keys to your Google scripts.</div>
+      <form id="pin-form" style="display:grid;gap:14px;margin-top:14px">
+        <label class="field">PIN<input id="pin-in" type="password" inputmode="numeric" autocomplete="off" maxlength="8"></label>
+        <div class="hint" id="pin-msg"></div>
+        <div class="actions" style="margin-top:0">
+          <button type="button" class="btn ghost" data-act="close">Cancel</button>
+          <button class="btn">Unlock</button>
+        </div>
+      </form>`);
+    setTimeout(() => $('#pin-in')?.focus(), 50);
+    $('#pin-form').addEventListener('submit', async e => {
+      e.preventDefault();
+      const msg = $('#pin-msg');
+      if (Date.now() < pinBlockedUntil) { msg.textContent = `Too many tries. Wait ${Math.ceil((pinBlockedUntil - Date.now()) / 1000)} seconds.`; return; }
+      if (await sha256(cfg.pinSalt + ':' + $('#pin-in').value) === cfg.pinHash) {
+        pinFails = 0;
+        unlockedUntil = Date.now() + 5 * 60 * 1000;
+        openSettings();
+        return;
+      }
+      pinFails++;
+      $('#pin-in').value = '';
+      // Each run of five wrong tries locks the pad for longer.
+      if (pinFails % 5 === 0) pinBlockedUntil = Date.now() + 60000 * 2 ** (pinFails / 5 - 1);
+      msg.textContent = pinFails % 5 === 0 ? 'Too many tries. Locked for a while.' : 'Wrong PIN.';
+    });
   }
   function renderSettings() {
     const hours = sel => Array.from({ length: 24 }, (_, h) => `<option value="${h}"${+sel === h ? ' selected' : ''}>${new Date(2000, 0, 1, h).toLocaleTimeString([], { hour: 'numeric' })}</option>`).join('');
@@ -937,7 +1004,7 @@
           <div class="swatches">${COLORS.map(c => `<button type="button" style="--c:${c}" data-color="${c}" aria-pressed="${m.color === c}" aria-label="Color"></button>`).join('')}</div>
         </div>
         <label class="field">Script URL (ends in /exec)<input data-f="url" value="${esc(m.url)}" placeholder="https://script.google.com/macros/s/…/exec" inputmode="url"></label>
-        <label class="field">Key<input data-f="key" value="${esc(m.key)}" placeholder="from the script's setup log"></label>
+        <label class="field">Key<input data-f="key" type="password" autocomplete="off" value="${esc(m.key)}" placeholder="from the script's setup log"></label>
         <label class="field">Google email (so others can invite them to events)<input data-f="email" value="${esc(m.email || '')}" placeholder="name@gmail.com" inputmode="email"></label>
         <label class="field">Work email (gets a private invite for anything during work hours)<input data-f="workEmail" value="${esc(m.workEmail || '')}" placeholder="name@company.com" inputmode="email"></label>
         <div class="member-foot">
@@ -963,6 +1030,12 @@
         <label class="field">Work day starts<select id="s-wf">${hours(draft.workFrom)}</select></label>
         <label class="field">…and ends<select id="s-wt">${hours(draft.workTo)}</select></label>
       </div>
+      <h3>Lock settings</h3>
+      <div class="hint">A PIN keeps anyone at the tablet from seeing the keys or changing where the hub sends things. ${cfg.pinHash ? 'A PIN is set.' : 'No PIN yet.'}</div>
+      <div class="grid2" style="margin-top:10px">
+        <label class="field">${cfg.pinHash ? 'New PIN (blank = keep)' : 'PIN (4–8 digits)'}<input id="s-pin" type="password" inputmode="numeric" autocomplete="new-password" maxlength="8"></label>
+      </div>
+      ${cfg.pinHash ? '<p><label class="check"><input type="checkbox" id="s-pin-off"> Remove the PIN</label></p>' : ''}
       <h3>Set up another screen</h3>
       <div class="hint">Copies a link with these settings, keys included — open it on the tablet instead of typing everything again. Only send it to each other.</div>
       <div class="actions" style="justify-content:flex-start"><button type="button" class="btn ghost" data-act="copy-setup">Copy setup link</button></div>
@@ -987,7 +1060,7 @@
     draft.nightTo = +$('#s-nt').value;
   }
   function applyCfg(next) {
-    cfg = { ...DEFAULTS, ...next };
+    cfg = cleanCfg(next);
     save(K_CFG, cfg);
     const ids = new Set(cfg.members.map(m => m.id));
     for (const id of Object.keys(data)) if (!ids.has(id)) delete data[id];
@@ -1070,6 +1143,10 @@
     }
     if (act === 'save') {
       readSettingsForm();
+      const pin = $('#s-pin').value.trim();
+      if (pin && !/^\d{4,8}$/.test(pin)) { toast('The PIN must be 4 to 8 digits.'); return; }
+      if ($('#s-pin-off')?.checked) { draft.pinHash = ''; draft.pinSalt = ''; }
+      else if (pin) { draft.pinSalt = randomHex(16); draft.pinHash = await sha256(draft.pinSalt + ':' + pin); }
       draft.members = draft.members.filter(m => m.name || m.url);
       draft.members.forEach(m => { if (!m.name) m.name = 'Someone'; });
       draft.demo = false;

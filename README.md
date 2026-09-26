@@ -122,15 +122,15 @@ publish a new version (**Deploy → Manage deployments → ✏️ → New versio
 
 ### 1b. School dates from APS email and photos (automatic)
 
-A scheduled Claude task runs twice a day, at 6:47am and 5:47pm Albuquerque time, on Scott's
+A scheduled Claude task runs twice a day, at 6:47am and 5:47pm local time, on the account
 Claude plan, so no API key or extra billing is needed. It uses the Gmail, Google Calendar
 and Google Drive connections on that Claude account. Each run:
 
 - reads new mail from `@aps.edu` (the district and teachers), including newsletters;
-- reads new photos in the **Family Hub Inbox** folder in Scott's Google Drive;
+- reads new photos in the **Family Hub Inbox** folder in that person's Google Drive;
 - adds every date a parent needs (no-school days, early releases, picture day,
-  conferences, field trips, form and payment deadlines) to Scott's calendar, with a 🏫 in
-  front of school items, and invites Carolyn so it's on her calendar too. No invite email
+  conferences, field trips, form and payment deadlines) to their calendar, with a 🏫 in
+  front of school items, and invites the other parent so it's on their calendar too. No invite email
   is sent.
 - makes anything during work hours (a timed event Monday–Friday that overlaps 8am–5pm)
   private and adds both work emails as optional guests, the same way the hub's **+ Add** does.
@@ -148,8 +148,32 @@ or schedule (or pick one from the tablet's gallery), and add an optional note li
 class only". It's saved to the inbox folder and shows up on the calendar after the next
 run. From a phone, you can also drop a JPG, PNG or PDF straight into the **Family Hub Inbox**
 folder in Google Drive. iPhone HEIC photos don't work there, so use the hub or a screenshot.
-The 📷 button saves to the first person's script, so Scott should be first in Settings. The
+The 📷 button saves to the first person's script, so the person whose account runs the scheduled task should be first in Settings. The
 script creates the folder when you run **setup**.
+### Security
+
+- **Settings PIN.** Settings hold each script's key, so set a PIN under ⚙️ → *Lock settings*.
+  After five wrong tries the PIN pad locks for a minute, then longer. A forgotten PIN can be
+  cleared only by clearing the hub's site data in Chrome, which removes all settings.
+- **Keys.** Each script answers only requests that carry its key (64 random characters for a
+  new one). If the tablet is lost or a setup link goes somewhere it shouldn't, open the script
+  and run **newKey**. The old key stops working at once. Then put the new key into Settings.
+- **Setup links** contain the keys. Send them only to each other, then delete the message.
+- **Locked-down page.** The hub may only talk to Google Apps Script, Google Drive images and
+  the weather service. It loads no outside scripts, and every setting that arrives in a setup
+  link is checked (only real script addresses, known colors, sensible numbers) before use.
+- **The scheduled task** treats email and photo text as data, only ever creates calendar
+  events, and never sends, forwards or deletes anything.
+- **The tablet** doesn't need to be signed into your Google accounts, and it's safer if it
+  isn't. Keep Android updated, and use a screen lock or Fully Kiosk's PIN if the tablet is
+  somewhere visitors can reach.
+- **This repository is public.** No keys or passwords are stored in it, but anyone can read
+  it. See the note at the end of this section.
+
+**Note on the public repository:** the other pages and parts of this README mention the family
+and the behavior log by name. Either remove the names, or make the repository private.
+GitHub Pages for a private repository needs a paid GitHub plan.
+
 ### 2. The meals note (your wife's iPhone, ~3 minutes)
 
 Apple Notes has no way for other apps to read it, so an iPhone Shortcut sends the note
