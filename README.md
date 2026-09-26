@@ -189,6 +189,13 @@ How a day is decided:
 - **School at home:** APS virtual-learning days.
 - **School day:** everything else. Early releases say *Short day*.
 
+**What to wear.** Today's high picks a color, with the clothes to match: purple *Freezing*
+(≤32°: 🧥🧣🧤), blue *Cold* (33–49°: 🧥👖), teal *Cool* (50–64°: light jacket), orange *Warm*
+(65–79°: 👕) and red *Hot* (80°+: 👕🩳🧢). A morning low under 50° adds "jacket this morning" (the
+same line his morning routine uses), and rain or snow add ☔ or 🥾. A color bar shows where
+today falls, and tapping the card reads it out. The same colors mark every temperature on the
+hub and on his week tiles, always next to the number, so color is never the only clue.
+
 **My jobs.** Big picture tiles Paul taps to check off ("Make bed. Done! Great job!"). When
 they're all done, there's a small celebration. Grown-ups set the jobs with **✏️ Grown-ups: edit
 jobs** at the bottom of his view (behind the Settings PIN). Each job has an emoji, a word or two,
