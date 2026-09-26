@@ -254,6 +254,9 @@ If both of you set an album in your own scripts, the frame mixes them.
 - Open `hub.html` in Chrome, then use ⚙️ → **Copy setup link** on a phone where you've
   already filled everything in, and open that link on the tablet so nobody has to type
   keys on it. The link contains the keys, so send it only to each other.
+- **iPhone:** the Home Screen app keeps its own storage, separate from Safari's. So add the
+  hub to the Home Screen first (Safari → Share → **Add to Home Screen**), open it from the icon,
+  tap **I have a setup link** (or ⚙️ → **Paste a setup link**), and paste the link.
 - Chrome menu → **Add to home screen / Install**. The installed hub opens full screen in
   landscape.
 - Settings on the tablet: **Display → Screen timeout** to the longest option (the hub also

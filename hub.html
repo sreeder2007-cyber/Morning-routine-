@@ -530,6 +530,7 @@
           </ol>
           <div class="row">
             <button class="btn" data-act="settings">Open Settings</button>
+            <button class="btn ghost" data-act="paste-setup">I have a setup link</button>
             <button class="btn ghost" data-act="demo">Try it with sample data</button>
           </div>
         </div>`;
@@ -1377,8 +1378,8 @@
       </div>
       ${cfg.pinHash ? '<p><label class="check"><input type="checkbox" id="s-pin-off"> Remove the PIN</label></p>' : ''}
       <h3>Set up another screen</h3>
-      <div class="hint">Copies a link with these settings, keys included — open it on the tablet instead of typing everything again. Only send it to each other.</div>
-      <div class="actions" style="justify-content:flex-start"><button type="button" class="btn ghost" data-act="copy-setup">Copy setup link</button></div>
+      <div class="hint">Copies a link with these settings, keys included, so another screen can load them without retyping. Open the link in the browser, or on an iPhone Home Screen app, use Paste a setup link. Only send it to each other.</div>
+      <div class="actions" style="justify-content:flex-start"><button type="button" class="btn ghost" data-act="copy-setup">Copy setup link</button><button type="button" class="btn ghost" data-act="paste-setup">Paste a setup link</button></div>
       <div class="actions">
         <button type="button" class="btn ghost" data-act="fullscreen">Full screen</button>
         <button type="button" class="btn ghost" data-act="close">Cancel</button>
@@ -1417,10 +1418,39 @@
     const m = location.hash.match(/^#setup=([\w-]+)/);
     if (!m) return;
     history.replaceState(null, '', location.pathname + location.search);
+    loadSetup(m[1]);
+  }
+  // Returns true if settings were loaded. Used by setup links opened in the browser and by the
+  // "Paste a setup link" box, which an iPhone Home Screen app needs because it keeps its own
+  // storage, separate from Safari's.
+  function loadSetup(code) {
     try {
-      const next = JSON.parse(unb64(m[1]));
-      if (confirm(`Load settings for ${next.members.map(x => x.name).join(' & ') || 'this hub'}? This replaces what's on this screen.`)) applyCfg(next);
-    } catch { toast('That setup link is damaged.'); }
+      const next = JSON.parse(unb64(code));
+      if (!Array.isArray(next.members)) throw new Error('no members');
+      if (!confirm(`Load settings for ${next.members.map(x => x.name).join(' & ') || 'this hub'}? This replaces what's on this screen.`)) return false;
+      applyCfg(next);
+      toast('Settings loaded.');
+      return true;
+    } catch { toast('That setup link is damaged. Copy it again.'); return false; }
+  }
+  function openPasteSetup() {
+    openSheet(`
+      <h2>Paste a setup link</h2>
+      <div class="hint">On the screen that's already set up: ⚙️ → Copy setup link. Send it here, copy it, and paste it below.</div>
+      <form id="paste-form" style="display:grid;gap:14px;margin-top:14px">
+        <label class="field">Setup link<input id="paste-in" autocomplete="off" placeholder="https://…hub.html#setup=…"></label>
+        <div class="actions" style="margin-top:0">
+          <button type="button" class="btn ghost" data-act="close">Cancel</button>
+          <button class="btn">Load</button>
+        </div>
+      </form>`);
+    setTimeout(() => $('#paste-in')?.focus(), 50);
+    $('#paste-form').addEventListener('submit', e => {
+      e.preventDefault();
+      const m = $('#paste-in').value.trim().match(/setup=([\w-]+)/);
+      if (!m) { toast('That doesn\'t look like a setup link. It contains "#setup=".'); return; }
+      if (loadSetup(m[1])) closeSheet();
+    });
   }
 
   /* ── Events ── */
@@ -1464,6 +1494,7 @@
     if (!act) return;
     if (act === 'settings') openSettings();
     if (act === 'close') closeSheet();
+    if (act === 'paste-setup') openPasteSetup();
     if (act === 'planner') openPlanner();
     if (act === 'import') openImport();
     if (act === 'snap-again') { closeSheet(); openSnap(); }
