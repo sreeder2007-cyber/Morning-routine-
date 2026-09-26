@@ -52,6 +52,8 @@
   .wx-now { display: flex; align-items: center; gap: 8px; }
   .wx-now .ic { font-size: 40px; }
   .wx-now .tp { font-size: 38px; font-weight: 800; }
+  .tt { color: color-mix(in srgb, var(--tb) 88%, black); font-weight: 900; }
+  .tt.pill { display: inline-block; padding: 0 7px; border-radius: 8px; background: color-mix(in srgb, var(--tb) 16%, transparent); }
   .wx-now .hl { font-size: 16px; color: var(--muted); font-weight: 700; line-height: 1.2; }
   .wx-days { display: flex; gap: 14px; }
   .wx-day { text-align: center; font-size: 15px; font-weight: 700; color: var(--muted); }
@@ -267,11 +269,24 @@
   .kid-mini span { font-size: 46px; line-height: 1.2; }
   .kid-mini small { display: block; font-size: 15px; font-weight: 800; opacity: .85; }
   .kid-hint { font-size: 18px; font-weight: 700; opacity: .6; }
+  .kid-wear {
+    width: 100%; border: 3px solid var(--tb); border-radius: 30px; cursor: pointer; color: inherit; font: inherit;
+    background: color-mix(in srgb, var(--tb) 26%, transparent); padding: 14px 18px 16px; display: grid; gap: 6px; justify-items: center;
+  }
+  .kw-head { display: flex; align-items: baseline; gap: 14px; }
+  .kw-temp { font-size: 54px; font-weight: 900; line-height: 1; }
+  .kw-band { font-size: 30px; font-weight: 900; }
+  .kw-items { font-size: 64px; line-height: 1.1; letter-spacing: 6px; }
+  .kw-word { font-size: 24px; font-weight: 900; }
+  .kw-scale { display: flex; gap: 6px; width: 100%; max-width: 360px; margin-top: 4px; }
+  .kw-scale i { flex: 1; height: 14px; border-radius: 7px; background: var(--c); opacity: .35; }
+  .kw-scale i.on { opacity: 1; height: 22px; margin-top: -4px; box-shadow: 0 0 0 3px #fff; }
+  .kid-mini em { display: block; margin-top: 4px; font-style: normal; font-size: 15px; font-weight: 900; border-radius: 8px; padding: 1px 0; background: var(--tb); color: #fff; }
   .kid-edit { border: 0; background: none; color: inherit; font: inherit; text-decoration: underline; cursor: pointer; }
   .kid-grid { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 28px; width: min(1240px, 100%); align-items: start; }
   .kid-col { display: flex; flex-direction: column; gap: 22px; align-items: center; min-width: 0; }
   .kid-grid .kid-today { width: 100%; padding: 20px 20px 24px; }
-  .kid-grid .kid-icon { font-size: 150px; }
+  .kid-grid .kid-icon { font-size: 120px; }
   .kid-grid .kid-word { font-size: 52px; }
   .kid-grid .kid-mini { width: 78px; padding: 10px 4px 12px; }
   .kid-grid .kid-mini span { font-size: 38px; }
@@ -662,7 +677,7 @@
       };
       const body = allDay.length + timed.length ? allDay.map(chip).join('') + timed.map(chip).join('') : '<div class="empty-day">Nothing planned</div>';
       const w = wx?.days?.find(d => d.t === dayKey(day));
-      const wxHtml = w ? `<div class="day-wx"><span class="ic">${WX(w.c)}</span>${w.hi}° <small>${w.lo}°</small></div>` : '';
+      const wxHtml = w ? `<div class="day-wx"><span class="ic">${WX(w.c)}</span>${tempTag(w.hi, 'pill')} <small>${w.lo}°</small></div>` : '';
       const dinner = days === 3 ? dinnerOn(day) : '';
       const dinnerHtml = dinner ? `<div class="day-dinner"><b>Dinner</b>${esc(dinner)}${mealExtras(dinner)}</div>` : '';
       html += `<div class="day${i === 0 ? ' today' : ''}"><div class="day-head"><h3>${label}<b>${esc(big)}</b></h3>${wxHtml}</div>${dinnerHtml}
@@ -955,6 +970,33 @@
   }
 
   /* ── Weather (Open-Meteo, no key) ── */
+  /* Temperature colors, used everywhere a temperature shows and in Paul's "What to wear".
+     The color always comes with words and clothes pictures, never color alone. */
+  const TEMP_BANDS = [
+    { max: 32, label: 'Freezing', color: '#6a4fd1', wear: ['🧥', '🧣', '🧤'], word: 'Big coat, scarf & gloves', say: 'your big coat, a scarf and gloves' },
+    { max: 49, label: 'Cold', color: '#2f6fd6', wear: ['🧥', '👖'], word: 'Coat & pants', say: 'your coat and long pants' },
+    { max: 64, label: 'Cool', color: '#16998a', wear: ['👕', '🧥'], word: 'Light jacket', say: 'a light jacket' },
+    { max: 79, label: 'Warm', color: '#e08a00', wear: ['👕'], word: 'T-shirt', say: 'a T-shirt' },
+    { max: 999, label: 'Hot', color: '#d93a2b', wear: ['👕', '🩳', '🧢'], word: 'Shorts & hat', say: 'shorts and a hat. Drink lots of water' }
+  ];
+  const bandOf = t => TEMP_BANDS.find(b => t <= b.max);
+  const tempTag = (t, cls = '') => `<span class="tt${cls ? ' ' + cls : ''}" style="--tb:${bandOf(t).color}">${t}°</span>`;
+  const isRain = c => (c >= 51 && c <= 67) || (c >= 80 && c <= 82) || c >= 95;
+  const isSnow = c => (c >= 71 && c <= 77) || c === 85 || c === 86;
+  // What to wear on a day: the high sets the band; a chilly morning (low under 50°, the same line
+  // his morning routine uses for the jacket) adds a jacket; rain and snow add their gear.
+  function wearFor(day) {
+    const w = wx?.days?.find(d => d.t === dayKey(day));
+    if (!w) return null;
+    const band = bandOf(w.hi);
+    const items = [...band.wear], extras = [], say = [];
+    const morning = w.lo < 50 && w.hi > 49;
+    if (morning) { if (!items.includes('🧥')) items.push('🧥'); extras.push('jacket this morning'); say.push("It's chilly this morning, so bring a jacket."); }
+    if (isRain(w.c)) { items.push('☔'); extras.push('raincoat'); say.push('It might rain, so bring your raincoat.'); }
+    if (isSnow(w.c)) { items.push('🥾'); extras.push('boots'); say.push('It might snow, so wear your boots.'); }
+    return { band, hi: w.hi, lo: w.lo, items, word: [band.word, ...extras].join(' + '),
+      speech: `Today will be ${band.label.toLowerCase()}, up to ${w.hi} degrees. Wear ${band.say}. ${say.join(' ')}`.trim() };
+  }
   const WX = c => c === 0 ? '☀️' : c <= 2 ? '🌤️' : c === 3 ? '☁️' : c <= 48 ? '🌫️' : c <= 57 ? '🌦️' : c <= 67 ? '🌧️' : c <= 77 ? '🌨️' : c <= 82 ? '🌧️' : c <= 86 ? '🌨️' : '⛈️';
   async function getWeather() {
     const zip = String(cfg.zip || '').trim();
@@ -981,15 +1023,16 @@
     try { wx = await getWeather(); } catch { wx = load(K_WX, null); }
     renderWeather();
     renderWeek();
+    if (!$('#kid').hidden) renderKid();
   }
   function renderWeather() {
     const el = $('#wx');
     if (!wx || wx.zip !== String(cfg.zip || '').trim()) { el.innerHTML = ''; return; }
     const [d0, ...rest] = wx.days;
     el.innerHTML = `
-      <div class="wx-now"><span class="ic">${WX(wx.now.c)}</span><span class="tp">${wx.now.t}°</span>
-        <span class="hl">H ${d0.hi}°<br>L ${d0.lo}°</span></div>
-      <div class="wx-days">${rest.slice(0, 4).map(d => `<div class="wx-day">${parseDay(d.t).toLocaleDateString([], { weekday: 'short' })}<span class="ic">${WX(d.c)}</span><b>${d.hi}°</b> ${d.lo}°</div>`).join('')}</div>`;
+      <div class="wx-now"><span class="ic">${WX(wx.now.c)}</span><span class="tp">${tempTag(wx.now.t)}</span>
+        <span class="hl">H ${tempTag(d0.hi)}<br>L ${tempTag(d0.lo)}</span></div>
+      <div class="wx-days">${rest.slice(0, 4).map(d => `<div class="wx-day">${parseDay(d.t).toLocaleDateString([], { weekday: 'short' })}<span class="ic">${WX(d.c)}</span>${tempTag(d.hi, 'pill')} ${d.lo}°</div>`).join('')}</div>`;
   }
 
   /* ── Clock, status ── */
@@ -1258,11 +1301,19 @@
             <div class="kid-word">${k.word}</div>
             ${t.why && t.why !== 'Weekend' ? `<div class="kid-why">${esc(t.why)}</div>` : ''}
           </button>
+          ${(() => { const wr = wearFor(today); return wr ? `
+          <button class="kid-wear" data-wear style="--tb:${wr.band.color}">
+            <div class="kw-head"><span class="kw-temp">${wr.hi}°</span><span class="kw-band">${wr.band.label}</span></div>
+            <div class="kw-items" aria-hidden="true">${wr.items.join('')}</div>
+            <div class="kw-word">${esc(wr.word)}</div>
+            <div class="kw-scale" aria-hidden="true">${TEMP_BANDS.map(b => `<i style="--c:${b.color}"${b === wr.band ? ' class="on"' : ''}></i>`).join('')}</div>
+          </button>` : ''; })()}
           <div class="kid-week">${week.map((d, i) => { const w = dayType(d); return `
             <button class="kid-mini ${w.kind}" data-say="${i + 1}">
               <b>${d.toLocaleDateString([], { weekday: 'short' })}</b>
               <span aria-hidden="true">${KID[w.kind].icon}</span>
               <small>${w.kind === 'school' ? 'School' : w.kind === 'virtual' ? 'Computer' : 'Home'}</small>
+              ${(() => { const f = wx?.days?.find(x => x.t === dayKey(d)); return f ? `<em style="--tb:${bandOf(f.hi).color}">${f.hi}°</em>` : ''; })()}
             </button>`; }).join('')}</div>
         </div>
         <div class="kid-col">
@@ -1823,6 +1874,7 @@
   document.addEventListener('click', async e => {
     const t = e.target;
     if (t.id === 'modal') { closeSheet(); return; }
+    if (t.closest('[data-wear]')) { const wr = wearFor(startOfDay(new Date())); if (wr) speakKid(wr.speech); return; }
     const job = t.closest('[data-job]');
     if (job) { toggleJob(job.dataset.job); return; }
     const cd = t.closest('[data-cd]');
