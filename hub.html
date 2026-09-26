@@ -147,6 +147,27 @@
   .meal .lbl { font-size: 14px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: #c0613f; min-width: 104px; }
   .meal-tmrw { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); font-size: 16px; color: var(--muted); font-weight: 700; }
   .meal-tmrw b { color: var(--ink); }
+  .plan-btn { margin-left: auto; border: 0; background: var(--soft); border-radius: 10px; padding: 6px 12px; font-weight: 800; font-size: 14px; letter-spacing: 0; text-transform: none; color: var(--ink); }
+  .sheet.wide { width: min(1000px, 100%); }
+  .plan-row { display: grid; grid-template-columns: 110px repeat(3, minmax(0, 1fr)) 48px; gap: 8px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--line); }
+  .plan-row.head { font-size: 13px; font-weight: 800; color: var(--muted); letter-spacing: .06em; text-transform: uppercase; padding-top: 0; }
+  .plan-row .dl { font-weight: 800; font-size: 16px; line-height: 1.15; }
+  .plan-row .dl small { display: block; font-size: 13px; color: var(--muted); font-weight: 700; }
+  .plan-row input { border: 2px solid var(--line); border-radius: 10px; padding: 9px 10px; font-size: 16px; font-weight: 600; background: #fff; width: 100%; min-width: 0; }
+  .plan-row input:focus { border-color: var(--ink); outline: none; }
+  .plan-row.today .dl { color: #c0613f; }
+  .cart { border: 0; background: var(--soft); border-radius: 10px; height: 42px; font-size: 18px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+  .chip { border: 2px solid var(--line); background: #fff; border-radius: 99px; padding: 6px 12px; font-weight: 700; font-size: 15px; }
+  .chip.new { border-style: dashed; color: var(--muted); }
+  .field textarea { border: 2px solid var(--line); border-radius: 10px; padding: 9px 10px; font-size: 15px; font-weight: 600; background: #fff; color: var(--ink); width: 100%; min-height: 150px; font-family: inherit; }
+  @media (max-width: 700px) {
+    .plan-row { grid-template-columns: 1fr 48px; }
+    .plan-row .dl { grid-column: 1 / -1; }
+    .plan-row.head { display: none; }
+    .plan-row input { grid-column: 1; }
+    .plan-row .cart { grid-column: 2; grid-row: 2 / span 3; height: 100%; }
+  }
   .hint { color: var(--muted); font-size: 16px; font-weight: 600; line-height: 1.45; }
 
   .list-add { display: flex; gap: 8px; margin-bottom: 8px; }
@@ -406,7 +427,7 @@
     }
   }
   const inFlight = new Set();
-  async function refreshAll(parts = ['calendar', 'meals', 'list']) {
+  async function refreshAll(parts = ['calendar', 'meals', 'list', 'plan']) {
     const tag = parts.join();
     if (inFlight.has(tag)) return;
     inFlight.add(tag);
@@ -441,6 +462,17 @@
         at: Date.now()
       }
     };
+  }
+  function demoPlan() {
+    const t = startOfDay(new Date());
+    const menu = [['Pancakes & fruit', 'Tacos'], ['Oatmeal', 'Spaghetti and meatballs'], ['Eggs & toast', 'Chicken stir-fry'], ['Yogurt parfaits', 'Sheet-pan salmon'], ['Waffles', 'Homemade pizza'], ['Smoothies', 'Pot roast'], ['French toast', 'Burgers on the grill']];
+    const days = {};
+    menu.forEach(([b, d], i) => { days[dayKey(addDays(t, i))] = { b, l: i % 2 ? 'Leftovers' : '', d }; });
+    return { days, favs: [
+      { name: 'Tacos', items: ['Ground beef', 'Taco shells', 'Shredded cheese', 'Salsa', 'Lettuce'] },
+      { name: 'Spaghetti and meatballs', items: ['Spaghetti', 'Marinara sauce', 'Frozen meatballs', 'Parmesan'] },
+      { name: 'Homemade pizza', items: ['Pizza dough', 'Mozzarella', 'Pepperoni', 'Pizza sauce'] }
+    ] };
   }
   const demoPhotos = () => Array.from({ length: 12 }, (_, i) => `https://picsum.photos/seed/familyhub${i}/1600/1000`);
   let demo = null;
@@ -582,32 +614,93 @@
     notes.sort((a, b) => new Date(b.at) - new Date(a.at));
     return notes[0] || null;
   }
-  // That day's dinner (or the whole day's meals if nothing is labeled dinner).
-  function dinnerOn(day) {
+  /* ── Meal plan (stored in the first person's script, like the family list) ── */
+  const K_LOCAL_PLAN = 'hub.plan';
+  const SLOTS = [['b', 'Breakfast'], ['l', 'Lunch'], ['d', 'Dinner']];
+  function currentPlan() {
+    if (demoOn()) { view(); return demo.plan || (demo.plan = demoPlan()); }
+    const home = listHome();
+    const p = home ? data[home.id]?.plan : load(K_LOCAL_PLAN, null);
+    return { days: p?.days || {}, favs: p?.favs || [] };
+  }
+  function applyPlanOp(plan, op) {
+    const days = { ...plan.days };
+    let favs = plan.favs.slice();
+    const clean = (v, n) => String(v || '').replace(/\s+/g, ' ').trim().slice(0, n);
+    if (op.action === 'planSet') {
+      const day = { b: '', l: '', d: '', ...days[op.date], [op.slot]: clean(op.text, 120) };
+      if (day.b || day.l || day.d) days[op.date] = day; else delete days[op.date];
+    }
+    if (op.action === 'favSave') {
+      const name = clean(op.name, 60), gone = (op.oldName || name).toLowerCase();
+      favs = favs.filter(f => f.name.toLowerCase() !== gone && f.name.toLowerCase() !== name.toLowerCase());
+      favs.push({ name, items: op.items.map(i => clean(i, 80)).filter(Boolean).slice(0, 40) });
+      favs.sort((a, b) => a.name.localeCompare(b.name));
+    }
+    if (op.action === 'favDelete') favs = favs.filter(f => f.name.toLowerCase() !== op.name.toLowerCase());
+    return { days, favs };
+  }
+  async function planOp(op) {
+    if (demoOn()) { demo.plan = applyPlanOp(currentPlan(), op); renderMealsEverywhere(); return; }
+    const home = listHome();
+    if (!home) { save(K_LOCAL_PLAN, applyPlanOp(currentPlan(), op)); renderMealsEverywhere(); return; }
+    const d = data[home.id] || (data[home.id] = {});
+    d.plan = applyPlanOp(currentPlan(), op);
+    renderMealsEverywhere();
+    try {
+      const j = await postScript(home, op);
+      d.plan = j.plan; save(K_DATA, data); renderMealsEverywhere();
+    } catch (e) {
+      toast(e.message === 'unknown action' ? 'Update the Google script to the latest version first (see README).' : `Couldn't save the meal plan (${e.message}).`);
+    }
+  }
+  function renderMealsEverywhere() { renderMeals(); renderWeek(); }
+
+  // A day's meals: the planner wins; otherwise fall back to the Apple Note, if there is one.
+  function mealsOn(day) {
+    const p = currentPlan().days[dayKey(day)];
+    if (p) return { b: p.b, l: p.l, d: p.d };
     const note = latestMealNote();
     const items = note && parseMeals(note.text)?.[day.getDay()];
-    if (!items?.length) return '';
-    const d = items.find(x => /^(dinner|supper|d)\s*[:\-–—]/i.test(x));
-    return d ? d.replace(/^(dinner|supper|d)\s*[:\-–—]\s*/i, '') : items.join(' · ');
+    if (!items?.length) return null;
+    const out = { b: '', l: '', d: '', other: [] };
+    for (const x of items) {
+      const m = x.match(/^(breakfast|lunch|dinner|supper|b|l|d)\s*[:\-–—]\s*(.+)$/i);
+      if (m) out[{ breakfast: 'b', lunch: 'l', dinner: 'd', supper: 'd' }[m[1].toLowerCase()] || m[1].toLowerCase()] = m[2];
+      else out.other.push(x);
+    }
+    if (!out.d && out.other.length) out.d = out.other.join(' · ');
+    return out;
   }
 
+  // That day's dinner (or the whole day's meals if nothing is labeled dinner).
+  function dinnerOn(day) {
+    return mealsOn(day)?.d || '';
+  }
   function renderMeals() {
     const el = $('#meals');
-    const note = latestMealNote();
-    if (!note) {
-      el.innerHTML = `<h2>🍽️ Meals</h2><div class="hint">Nothing yet. Once the iPhone Shortcut runs, the meals note shows up here — see the README.</div>`;
+    const btn = '<button class="plan-btn" data-act="planner">Plan meals</button>';
+    const dToday = new Date(), dTomorrow = addDays(dToday, 1);
+    if (currentPlan().days[dayKey(dToday)] || currentPlan().days[dayKey(dTomorrow)] || !latestMealNote()) {
+      const t = mealsOn(dToday), n = mealsOn(dTomorrow);
+      const rows = t ? SLOTS.filter(([k]) => t[k]).map(([k, label]) => `<div class="meal"><span class="lbl">${label}</span><span>${esc(t[k])}</span></div>`).join('') : '';
+      const next = n ? SLOTS.filter(([k]) => n[k]).map(([k, label]) => `${label}: ${n[k]}`).join(' · ') : '';
+      el.innerHTML = `<h2>🍽️ Today's meals${btn}</h2>
+        ${rows || '<div class="hint">Nothing planned for today. Tap <b>Plan meals</b> to fill in the week.</div>'}
+        ${next ? `<div class="meal-tmrw">Tomorrow: <b>${esc(next)}</b></div>` : ''}`;
       return;
     }
+    const note = latestMealNote();
     const byDay = parseMeals(note.text);
     const stamp = note.at ? `<span class="aside">updated ${ago(new Date(note.at).getTime())}</span>` : '';
     if (!byDay) {
       const lines = note.text.split(/\r?\n/).map(s => s.trim()).filter(Boolean).slice(0, 12);
-      el.innerHTML = `<h2>🍽️ Meals${stamp}</h2>${lines.map(mealRow).join('')}`;
+      el.innerHTML = `<h2>🍽️ Meals${stamp}${btn}</h2>${lines.map(mealRow).join('')}`;
       return;
     }
     const d = new Date().getDay();
     const today = byDay[d] || [], tmrw = byDay[(d + 1) % 7] || [];
-    el.innerHTML = `<h2>🍽️ Today's meals${stamp}</h2>
+    el.innerHTML = `<h2>🍽️ Today's meals${stamp}${btn}</h2>
       ${today.length ? today.map(mealRow).join('') : '<div class="hint">Nothing in the note for today.</div>'}
       ${tmrw.length ? `<div class="meal-tmrw">Tomorrow: <b>${esc(tmrw.join(' · '))}</b></div>` : ''}`;
   }
@@ -617,6 +710,7 @@
     const now = Date.now();
     list = list.map(i => ({ ...i }));
     if (op.action === 'listAdd' && op.text && !list.some(i => i.id === op.id)) list.push({ id: op.id, text: op.text, done: false, at: now });
+    if (op.action === 'listAddMany') for (const it of op.items) if (!list.some(i => i.id === it.id)) list.push({ id: it.id, text: it.text, done: false, at: now });
     if (op.action === 'listToggle') list.forEach(i => { if (i.id === op.id) { i.done = !i.done; i.at = now; } });
     if (op.action === 'listClearDone') list = list.filter(i => !i.done);
     return list;
@@ -948,8 +1042,91 @@
     if (ev.guests.length) DEMO_MEMBERS.filter(m => m !== who).forEach(m => demo[m.id].calendar.push(out));
   }
 
+  /* ── Meal planner ── */
+  let plannerWeek = 0;
+  const isLeftovers = n => /^(left ?overs?|eat out|takeout|take-out|out|fend for yourself|ffy)$/i.test(String(n).trim());
+  const favFor = (name, favs) => favs.find(f => f.name.toLowerCase() === String(name).trim().toLowerCase());
+  function openPlanner(week = plannerWeek) {
+    plannerWeek = week;
+    const { days, favs } = currentPlan();
+    const start = addDays(startOfDay(new Date()), week * 7);
+    const dates = Array.from({ length: 7 }, (_, i) => addDays(start, i));
+    const rows = dates.map(d => {
+      const key = dayKey(d), m = days[key] || mealsOn(d) || {};
+      const fromNote = !days[key] && mealsOn(d);
+      const cell = (slot, label) => `<input data-date="${key}" data-slot="${slot}" value="${esc(m[slot] || '')}" placeholder="${label}" list="fav-names" autocomplete="off" maxlength="120"${fromNote ? ' data-note="1"' : ''}>`;
+      const isToday = key === dayKey(new Date());
+      return `<div class="plan-row${isToday ? ' today' : ''}">
+        <div class="dl">${isToday ? 'Today' : d.toLocaleDateString([], { weekday: 'long' })}<small>${d.toLocaleDateString([], { month: 'short', day: 'numeric' })}</small></div>
+        ${cell('b', 'Breakfast')}${cell('l', 'Lunch')}${cell('d', 'Dinner')}
+        <button class="cart" data-cart="${key}" title="Add this day's ingredients to the list" aria-label="Add ingredients to the list">🛒</button>
+      </div>`;
+    }).join('');
+    // Dinners planned this week that aren't favorites yet: one tap to save them with ingredients.
+    const planned = [...new Set(dates.map(d => (days[dayKey(d)] || {}).d).filter(n => n && !isLeftovers(n)))];
+    const unsaved = planned.filter(n => !favFor(n, favs)).slice(0, 7);
+    openSheet(`
+      <h2>Meal plan</h2>
+      <div class="hint">Type a meal or pick a favorite. Changes save as you go and show on every screen. 🛒 puts a favorite's ingredients on the family list.</div>
+      <datalist id="fav-names">${favs.map(f => `<option value="${esc(f.name)}">`).join('')}</datalist>
+      <div class="actions" style="justify-content:flex-start;margin:14px 0 6px">
+        <button type="button" class="btn ${week === 0 ? '' : 'ghost'}" data-week="0">This week</button>
+        <button type="button" class="btn ${week === 1 ? '' : 'ghost'}" data-week="1">Next week</button>
+      </div>
+      <div class="plan-row head"><div></div><div>Breakfast</div><div>Lunch</div><div>Dinner</div><div></div></div>
+      ${rows}
+      <h3>Favorites</h3>
+      <div class="hint">Save a meal once with its ingredients, then pick it from the list any day.</div>
+      <div class="chips">
+        ${favs.map(f => `<button class="chip" data-fav="${esc(f.name)}">⭐ ${esc(f.name)}</button>`).join('')}
+        ${unsaved.map(n => `<button class="chip new" data-newfav="${esc(n)}">＋ ${esc(n)}</button>`).join('')}
+        <button class="chip new" data-newfav="">＋ New favorite</button>
+      </div>
+      <div class="actions">
+        <button type="button" class="btn ghost" data-cart-week="${dates.map(dayKey).join(',')}">🛒 Add this week's groceries</button>
+        <button type="button" class="btn" data-act="close">Done</button>
+      </div>`, true);
+  }
+  function openFavorite(name, isNew) {
+    const f = !isNew && favFor(name, currentPlan().favs);
+    openSheet(`
+      <h2>${f ? 'Edit favorite' : 'New favorite'}</h2>
+      <form id="fav-form" style="display:grid;gap:14px;margin-top:14px">
+        <label class="field">Meal<input id="fav-name" value="${esc(f ? f.name : name)}" maxlength="60" required autocomplete="off" placeholder="e.g. Tacos"></label>
+        <label class="field">Ingredients to buy, one per line<textarea id="fav-items" placeholder="Ground beef&#10;Taco shells&#10;Shredded cheese">${esc(f ? f.items.join('\n') : '')}</textarea></label>
+        <div class="actions" style="margin-top:0">
+          ${f ? `<button type="button" class="btn danger" data-favdel="${esc(f.name)}" style="margin-right:auto">Delete</button>` : ''}
+          <button type="button" class="btn ghost" data-act="planner">Back</button>
+          <button class="btn">Save</button>
+        </div>
+      </form>`);
+    $('#fav-form').addEventListener('submit', e => {
+      e.preventDefault();
+      const newName = $('#fav-name').value.trim();
+      if (!newName) return;
+      planOp({ action: 'favSave', name: newName, oldName: f ? f.name : '', items: $('#fav-items').value.split('\n') });
+      openPlanner();
+    });
+  }
+  // Ingredients for the favorites planned on these days, minus anything already on the list.
+  function addGroceries(keys) {
+    const { days, favs } = currentPlan();
+    const have = new Set(currentList().filter(i => !i.done).map(i => i.text.toLowerCase()));
+    const want = [], missing = new Set();
+    for (const k of keys) for (const [slot] of SLOTS) {
+      const meal = days[k]?.[slot];
+      if (!meal) continue;
+      const f = favFor(meal, favs);
+      if (!f || !f.items.length) { if (slot === 'd' && !isLeftovers(meal)) missing.add(meal); continue; }
+      for (const it of f.items) if (!have.has(it.toLowerCase())) { have.add(it.toLowerCase()); want.push(it); }
+    }
+    if (want.length) listOp({ action: 'listAddMany', items: want.map(text => ({ id: uid(), text })) });
+    const note = missing.size ? ` ${[...missing].slice(0, 3).join(', ')}${missing.size > 3 ? '…' : ''} ${missing.size === 1 ? 'has' : 'have'} no ingredients saved yet.` : '';
+    toast(want.length ? `Added ${want.length} item${want.length === 1 ? '' : 's'} to the list.${note}` : `Nothing new to add.${note}`);
+  }
+
   /* ── Sheets: settings, event details ── */
-  function openSheet(html) { $('#sheet').innerHTML = html; $('#modal').hidden = false; }
+  function openSheet(html, wide = false) { $('#sheet').innerHTML = html; $('#sheet').classList.toggle('wide', wide); $('#modal').hidden = false; }
   function closeSheet() { $('#modal').hidden = true; $('#sheet').innerHTML = ''; }
 
   let draft = null;
@@ -1095,6 +1272,18 @@
   document.addEventListener('click', async e => {
     const t = e.target;
     if (t.id === 'modal') { closeSheet(); return; }
+    const wk = t.closest('[data-week]');
+    if (wk) { openPlanner(+wk.dataset.week); return; }
+    const cart = t.closest('[data-cart]');
+    if (cart) { addGroceries([cart.dataset.cart]); return; }
+    const cartWeek = t.closest('[data-cart-week]');
+    if (cartWeek) { addGroceries(cartWeek.dataset.cartWeek.split(',')); return; }
+    const fav = t.closest('[data-fav]');
+    if (fav) { openFavorite(fav.dataset.fav, false); return; }
+    const newFav = t.closest('[data-newfav]');
+    if (newFav) { openFavorite(newFav.dataset.newfav, true); return; }
+    const favDel = t.closest('[data-favdel]');
+    if (favDel) { if (confirm(`Delete the favorite "${favDel.dataset.favdel}"?`)) { planOp({ action: 'favDelete', name: favDel.dataset.favdel }); openPlanner(); } return; }
     const add = t.closest('[data-add]');
     if (add) { openAddEvent(add.dataset.add); return; }
     const ev = t.closest('[data-ev]');
@@ -1112,6 +1301,7 @@
     if (!act) return;
     if (act === 'settings') openSettings();
     if (act === 'close') closeSheet();
+    if (act === 'planner') openPlanner();
     if (act === 'snap-again') { closeSheet(); openSnap(); }
     if (act === 'snap-send') sendSnap(t.closest('button'));
     if (act === 'demo') { cfg.demo = true; save(K_CFG, cfg); render(); }
@@ -1159,6 +1349,20 @@
       const link = `${location.origin}${location.pathname}#setup=${b64(JSON.stringify({ ...draft, demo: false }))}`;
       try { await navigator.clipboard.writeText(link); toast('Setup link copied'); }
       catch { prompt('Copy this link:', link); }
+    }
+  });
+
+  // Planner cells save when you leave them (or pick a favorite from the suggestions).
+  document.addEventListener('change', e => {
+    const inp = e.target.closest?.('[data-slot]');
+    if (!inp) return;
+    planOp({ action: 'planSet', date: inp.dataset.date, slot: inp.dataset.slot, text: inp.value });
+    // Copying a note-based day into the planner: save its other meals too, so the day moves over whole.
+    if (inp.dataset.note) {
+      $$(`[data-date="${inp.dataset.date}"]`).forEach(o => {
+        delete o.dataset.note;
+        if (o !== inp && o.value) planOp({ action: 'planSet', date: o.dataset.date, slot: o.dataset.slot, text: o.value });
+      });
     }
   });
 

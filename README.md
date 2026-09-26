@@ -174,7 +174,27 @@ script creates the folder when you run **setup**.
 and the behavior log by name. Either remove the names, or make the repository private.
 GitHub Pages for a private repository needs a paid GitHub plan.
 
-### 2. The meals note (your wife's iPhone, ~3 minutes)
+### Meal planning
+
+Tap **Plan meals** on the meals card. The planner shows a week (**This week** / **Next
+week**) with breakfast, lunch and dinner for each day. Type a meal, or start typing and pick a
+favorite. Each box saves as soon as you leave it, and the plan shows on every screen that uses
+the same script: today's meals on the card, and each day's dinner in the calendar columns.
+Phones can plan too: open the hub link and add it to the home screen.
+
+**Favorites** are meals saved with a shopping list, like *Tacos → ground beef, taco shells,
+cheese…*. Save one from the ＋ chips under the planner (it suggests this week's dinners) or with
+**＋ New favorite**. Then 🛒 on a day, or **Add this week's groceries**, puts those ingredients
+on the family list, skipping anything already on it.
+
+The plan lives in the first person's script, like the family list, and keeps two weeks of
+history. Update the script to the latest `hub-script.gs` (and publish a new version) to use it.
+
+The Apple Note still works as a fallback for any day the planner leaves empty, so you can
+switch over gradually. Typing into a day that came from the note moves the whole day into the
+planner. Once you've switched, delete the Shortcut automation.
+
+### 2. The meals note (optional, older way) (your wife's iPhone, ~3 minutes)
 
 Apple Notes has no way for other apps to read it, so an iPhone Shortcut sends the note
 to her Google script whenever she closes Notes. Build it in the **Shortcuts** app:
