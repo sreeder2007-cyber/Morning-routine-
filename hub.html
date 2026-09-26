@@ -87,6 +87,17 @@
   .ev.allday { background: var(--c); color: var(--on, #fff); border-left-color: rgba(0,0,0,.18); font-weight: 800; }
   .ev.allday .n { font-weight: 800; }
   .ev.past { opacity: .5; }
+  /* Three wide columns: large enough to read from across the kitchen. */
+  .week.d3 { gap: 14px; }
+  .week.d3 .day h3 { padding: 16px 18px 12px; font-size: 18px; }
+  .week.d3 .day h3 b { font-size: 42px; }
+  .week.d3 .evs { padding: 0 14px 16px; gap: 10px; }
+  .week.d3 .ev { font-size: 24px; padding: 10px 14px 12px; border-left-width: 8px; border-radius: 14px; }
+  .week.d3 .ev .t { font-size: 18px; }
+  .week.d3 .ev .loc { display: block; font-size: 16px; font-weight: 600; color: #5e544c; margin-top: 2px; }
+  .week.d3 .dots i { width: 12px; height: 12px; }
+  .week.d3 .empty-day { font-size: 19px; padding: 4px 6px; }
+  .ev .loc { display: none; }
   /* Seven columns only fit at the old, smaller size. */
   .week.d7 { gap: 10px; }
   .week.d7 .day h3 { padding: 12px 10px 8px; font-size: 12px; }
@@ -98,6 +109,7 @@
   .dots { display: inline-flex; gap: 3px; margin-left: auto; }
   .dots i { width: 10px; height: 10px; border-radius: 50%; background: var(--d); }
   .ev.allday .dots i { box-shadow: 0 0 0 1.5px #fff; }
+  .ev.allday .dots { margin-left: 8px; vertical-align: middle; }
   .empty-day { color: var(--muted); font-size: 16px; font-weight: 600; padding: 4px 4px; }
 
   .welcome {
@@ -209,9 +221,9 @@
   @media (max-width: 1099px) {
     body { overflow: auto; }
     .app { height: auto; min-height: 100dvh; }
-    .main { grid-template-columns: 1fr; }
+    .main { grid-template-columns: 1fr; align-content: start; }
     .week { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
-    .day { max-height: 420px; }
+    .week.d3 { grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); }
     .side { overflow: visible; display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); align-items: start; }
     .wx-days { display: none; }
   }
@@ -286,7 +298,7 @@
   const save = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
 
   const COLORS = ['#e76f51', '#2a9d8f', '#7c5cbf', '#e9a23b', '#3a86ff', '#d6457a'];
-  const DEFAULTS = { members: [], zip: '', idleMin: 10, photoSec: 20, days: 5, nightFrom: 22, nightTo: 6, demo: false };
+  const DEFAULTS = { members: [], zip: '', idleMin: 10, photoSec: 20, days: 3, nightFrom: 22, nightTo: 6, demo: false };
   const REFRESH_MS = 5 * 60 * 1000, PHOTO_REFRESH_MS = 60 * 60 * 1000, NIGHT_IDLE_MS = 2 * 60 * 1000;
 
   let cfg = { ...DEFAULTS, ...load(K_CFG, {}) };
@@ -445,9 +457,10 @@
     events = mergedEvents();
     const today = startOfDay(new Date()), now = Date.now();
     let html = '';
-    const days = [3, 5, 7].includes(+cfg.days) ? +cfg.days : 5;
+    const days = [3, 5, 7].includes(+cfg.days) ? +cfg.days : 3;
     week.style.setProperty('--days', days);
     week.classList.toggle('d7', days === 7);
+    week.classList.toggle('d3', days === 3);
     for (let i = 0; i < days; i++) {
       const day = addDays(today, i);
       const { allDay, timed } = eventsOn(day, events);
@@ -460,8 +473,9 @@
         if (ev.allDay) return `<button class="ev allday" style="--c:${c};--on:${textOn(c)}" data-ev="${idx}"><div class="n">${esc(ev.title)}${dots}</div></button>`;
         const s = new Date(ev.start), e = new Date(ev.end);
         const state = e.getTime() <= now ? ' past' : s.getTime() <= now ? ' now' : '';
-        const time = s < day ? 'cont.' : fmtTime(s);
-        return `<button class="ev${state}" style="--c:${c}" data-ev="${idx}"><div class="t">${time}${dots}</div><div class="n">${esc(ev.title)}</div></button>`;
+        const time = (s < day ? 'cont.' : fmtTime(s)) + (days === 3 ? ` – ${fmtTime(e)}` : '');
+        const loc = ev.location ? `<span class="loc">📍 ${esc(ev.location)}</span>` : '';
+        return `<button class="ev${state}" style="--c:${c}" data-ev="${idx}"><div class="t">${time}${dots}</div><div class="n">${esc(ev.title)}</div>${loc}</button>`;
       };
       const body = allDay.length + timed.length ? allDay.map(chip).join('') + timed.map(chip).join('') : '<div class="empty-day">Nothing planned</div>';
       html += `<div class="day${i === 0 ? ' today' : ''}"><h3>${label}<b>${esc(big)}</b></h3><div class="evs">${body}</div></div>`;
@@ -827,7 +841,7 @@
       <div class="grid2">
         <label class="field">ZIP code (weather)<input id="s-zip" value="${esc(draft.zip)}" inputmode="numeric" maxlength="10"></label>
         <label class="field">Photo frame after (minutes, 0 = never)<input id="s-idle" type="number" min="0" max="240" value="${esc(draft.idleMin)}"></label>
-        <label class="field">Days on the calendar<select id="s-days">${[3, 5, 7].map(n => `<option value="${n}"${+draft.days === n ? ' selected' : ''}>${n} days${n === 5 ? ' (easiest to read)' : ''}</option>`).join('')}</select></label>
+        <label class="field">Days on the calendar<select id="s-days">${[3, 5, 7].map(n => `<option value="${n}"${+draft.days === n ? ' selected' : ''}>${n} days${n === 3 ? ' (biggest text)' : ''}</option>`).join('')}</select></label>
         <label class="field">Seconds per photo<input id="s-psec" type="number" min="5" max="600" value="${esc(draft.photoSec)}"></label>
         <label class="field">Screen goes dark at<select id="s-nf">${hours(draft.nightFrom)}</select></label>
         <label class="field">…and wakes at<select id="s-nt">${hours(draft.nightTo)}</select></label>
