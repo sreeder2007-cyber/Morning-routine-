@@ -174,6 +174,38 @@ script creates the folder when you run **setup**.
 and the behavior log by name. Either remove the names, or make the repository private.
 GitHub Pages for a private repository needs a paid GitHub plan.
 
+### Paul's view
+
+The **🧒 Paul** button at the top turns the tablet into a view for Paul: the same night-sky look
+as his morning routine, big pictures and one or two words. It shows **today** as 🏫 *School
+day*, 🏠 *Home day* (with the reason, e.g. *Fall Break*) or 💻 *School at home*, plus the next
+seven days as small picture tiles. Tapping a picture reads it aloud ("On Tuesday, it's a home
+day. No school! It's Fall Break."). ✕ goes back, and so does leaving it alone for three minutes.
+
+How a day is decided:
+- **Home day:** Saturdays and Sundays; closures, breaks and holidays on the APS district
+  calendar (or 🏫 events the school-dates task added); and anything on your calendar titled
+  **"No school"** or **"Home day"**. Use that for trips, like `No school - Disney`.
+- **School at home:** APS virtual-learning days.
+- **School day:** everything else. Early releases say *Short day*.
+
+**My jobs.** Big picture tiles Paul taps to check off ("Make bed. Done! Great job!"). When
+they're all done, there's a small celebration. Grown-ups set the jobs with **✏️ Grown-ups: edit
+jobs** at the bottom of his view (behind the Settings PIN). Each job has an emoji, a word or two,
+and when it applies: every day, school days, home days (these follow the 🏫/🏠 above), or one
+date. Ticks reset each day.
+
+**Coming up.** The next three big events, with a moon for each sleep left (a number when it's
+more than 10 away). These count: birthdays, APS breaks, big holidays from the US holidays
+calendar (Halloween, Thanksgiving, Christmas…), anything titled "No school …" or "Home day …",
+and anything with ⭐ in the title. **+ Add** has a *⭐ Count down to it* box for that.
+
+Jobs and ticks are stored in the first person's script, so every screen agrees. Countdowns look
+150 days ahead. Both need the latest `hub-script.gs`. Until it's updated, jobs are kept on the
+screen where they're set, and countdowns only see the next week.
+
+The button's name is in Settings (*Child's name*); leave it blank to hide the button.
+
 ### Dinner planning
 
 Tap **Plan dinners** on the dinner card. The planner shows a week of dinners, **Friday to
@@ -254,6 +286,9 @@ If both of you set an album in your own scripts, the frame mixes them.
 - Open `hub.html` in Chrome, then use ⚙️ → **Copy setup link** on a phone where you've
   already filled everything in, and open that link on the tablet so nobody has to type
   keys on it. The link contains the keys, so send it only to each other.
+- **iPhone:** the Home Screen app keeps its own storage, separate from Safari's. So add the
+  hub to the Home Screen first (Safari → Share → **Add to Home Screen**), open it from the icon,
+  tap **I have a setup link** (or ⚙️ → **Paste a setup link**), and paste the link.
 - Chrome menu → **Add to home screen / Install**. The installed hub opens full screen in
   landscape.
 - Settings on the tablet: **Display → Screen timeout** to the longest option (the hub also
