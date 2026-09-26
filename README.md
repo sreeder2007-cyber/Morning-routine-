@@ -107,7 +107,7 @@ everyone else** to put it on the others' calendars too; that needs each person's
 email filled in under ⚙️ Settings, and no invite email is sent.
 
 **During work hours** (Monday–Friday, 8am–5pm by default; change it in Settings), the form
-offers to make the event **private** and send an invite to each person's **work email**
+offers to make the event **private** and add each person's **work email** as an **optional** guest
 (also in Settings), so it blocks the time on work calendars without coworkers seeing what
 it is. Only the work addresses get an invite email. Family members' Google calendars
 still get it quietly. Private events show a 🔒 on the hub. Evenings, weekends and all-day
@@ -133,7 +133,7 @@ and Google Drive connections on that Claude account. Each run:
   front of school items, and invites Carolyn so it's on her calendar too. No invite email
   is sent.
 - makes anything during work hours (a timed event Monday–Friday that overlaps 8am–5pm)
-  private and invites both work emails, the same way the hub's **+ Add** does.
+  private and adds both work emails as optional guests, the same way the hub's **+ Add** does.
 
 It works out relative dates ("this Sunday") from when the email was sent or the photo was
 taken. Before adding anything it checks the calendar, so reminder emails don't create

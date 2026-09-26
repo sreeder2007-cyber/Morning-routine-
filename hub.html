@@ -851,7 +851,7 @@
         <label class="field">Where (optional)<input id="ae-loc" maxlength="200" autocomplete="off"></label>
         ${ms.length > 1 ? `<label class="field">Whose calendar<select id="ae-who">${ms.map((m, i) => `<option value="${i}">${esc(m.name)}</option>`).join('')}</select></label>` : ''}
         <label class="check" id="ae-invite-row"${others(ms[0]).length ? '' : ' hidden'}><input type="checkbox" id="ae-invite" checked> Invite everyone else, so it's on their calendar too</label>
-        <label class="check" id="ae-work-row" hidden><input type="checkbox" id="ae-work" checked> <span>During work hours: make it private and send it to <span id="ae-work-to"></span></span></label>
+        <label class="check" id="ae-work-row" hidden><input type="checkbox" id="ae-work" checked> <span>During work hours: make it private and add <span id="ae-work-to"></span> as optional</span></label>
         <div class="actions" style="margin-top:4px">
           <button type="button" class="btn ghost" data-act="close">Cancel</button>
           <button class="btn" id="ae-save">Add</button>

@@ -203,8 +203,11 @@ function addEvent_(ev) {
   const body = { summary: title };
   if (ev.location) body.location = String(ev.location).slice(0, 200);
   if (ev.private) body.visibility = 'private';
-  const guests = [].concat(ev.guests || [], ev.workGuests || []).filter(isEmail);
-  if (guests.length) body.attendees = guests.map(function (g) { return { email: g }; });
+  // Family members are regular guests; work addresses are optional, so the invite reads as
+  // an FYI hold on the work calendar rather than a meeting to accept.
+  const attendees = (ev.guests || []).filter(isEmail).map(function (g) { return { email: g }; })
+    .concat((ev.workGuests || []).filter(isEmail).map(function (g) { return { email: g, optional: true }; }));
+  if (attendees.length) body.attendees = attendees;
 
   if (isTime(ev.start)) {
     // No end (or one before the start): an hour long, stopping at midnight.
