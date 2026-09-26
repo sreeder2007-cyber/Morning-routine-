@@ -31,6 +31,8 @@ const CALENDAR_IDS = [];
 
 const DAYS_AHEAD = 7;
 const LIST_MAX = 150;
+// Past days of the meal plan kept (so "what did we have last Tuesday" still works).
+const PLAN_KEEP_DAYS = 14;
 
 // Where photos from the hub's 📷 button go. The scheduled Claude task reads new files here
 // and moves each one into the Done subfolder after adding its dates to the calendar.
@@ -65,7 +67,7 @@ function doGet(e) {
   const p = (e && e.parameter) || {};
   if (!authorized_(p.key)) return json_({ error: 'bad key' });
   const parts = String(p.parts || 'calendar,meals,list').split(',');
-  const readers = { calendar: calendar_, meals: meals_, list: list_, photos: photos_ };
+  const readers = { calendar: calendar_, meals: meals_, list: list_, photos: photos_, plan: plan_ };
   const out = { ok: true, errors: {} };
   parts.forEach(function (part) {
     if (!readers[part]) return;
@@ -104,6 +106,10 @@ function doPost(e) {
       const name = stamp + (note ? ' — ' + note : '') + '.jpg';
       const file = inboxFolder_().createFile(Utilities.newBlob(bytes, 'image/jpeg', name));
       return json_({ ok: true, name: file.getName() });
+    }
+    if (/^(plan|fav)/.test(body.action)) {
+      try { applyPlanOp_(body); } catch (err) { return json_({ error: String(err.message || err) }); }
+      return json_({ ok: true, plan: plan_() });
     }
     if (/^list/.test(body.action)) {
       const list = applyListOp_(list_(), body);
@@ -170,7 +176,13 @@ function list_() {
 // Mirrors applyListOp in hub.html, which applies the same change optimistically.
 function applyListOp_(list, op) {
   const now = Date.now();
-  if (op.action === 'listAdd' && op.text) {
+  if (op.action === 'listAddMany') {
+    (op.items || []).slice(0, 60).forEach(function (it) {
+      if (it && it.text && !list.some(function (i) { return i.id === it.id; })) {
+        list.push({ id: String(it.id || now + Math.random()), text: String(it.text).slice(0, 200), done: false, at: now });
+      }
+    });
+  } else if (op.action === 'listAdd' && op.text) {
     if (!list.some(function (i) { return i.id === op.id; })) {
       list.push({ id: String(op.id || now), text: String(op.text).slice(0, 200), done: false, at: now });
     }
@@ -245,6 +257,82 @@ function addEvent_(ev) {
     const err = JSON.parse(res.getContentText() || '{}').error;
     throw new Error('Calendar: ' + ((err && err.message) || res.getResponseCode()));
   }
+}
+
+/* ── Meal plan ──
+ * Each planned day is its own property (PLAN:yyyy-MM-dd → {b, l, d}) and so is each favorite
+ * meal (FAV:name → {name, items}), which keeps every value far below the 9 KB property limit. */
+function plan_() {
+  const all = PROPS.getProperties();
+  const days = {};
+  const favs = [];
+  Object.keys(all).forEach(function (k) {
+    if (k.indexOf('PLAN:') === 0) days[k.slice(5)] = JSON.parse(all[k]);
+    else if (k.indexOf('FAV:') === 0) favs.push(JSON.parse(all[k]));
+  });
+  favs.sort(function (a, b) { return a.name.localeCompare(b.name); });
+  return { days: days, favs: favs };
+}
+
+// Mirrors applyPlanOp in hub.html, which applies the same change optimistically.
+function applyPlanOp_(op) {
+  const clean = function (v, n) { return String(v || '').replace(/\s+/g, ' ').trim().slice(0, n); };
+  if (op.action === 'planSet') {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(op.date) || ['b', 'l', 'd'].indexOf(op.slot) === -1) throw new Error('bad plan');
+    const key = 'PLAN:' + op.date;
+    const day = JSON.parse(PROPS.getProperty(key) || '{}');
+    day[op.slot] = clean(op.text, 120);
+    if (!day.b && !day.l && !day.d) PROPS.deleteProperty(key);
+    else PROPS.setProperty(key, JSON.stringify({ b: day.b || '', l: day.l || '', d: day.d || '' }));
+    // Drop days older than two weeks.
+    const cutoff = Utilities.formatDate(new Date(Date.now() - PLAN_KEEP_DAYS * 864e5), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+    PROPS.getKeys().forEach(function (k) { if (k.indexOf('PLAN:') === 0 && k.slice(5) < cutoff) PROPS.deleteProperty(k); });
+  } else if (op.action === 'favSave') {
+    const fav = cleanFav_(op);
+    if (!fav) throw new Error('bad favorite');
+    if (op.oldName && op.oldName.toLowerCase() !== fav.name.toLowerCase()) PROPS.deleteProperty('FAV:' + clean(op.oldName, 60).toLowerCase());
+    PROPS.setProperty('FAV:' + fav.name.toLowerCase(), JSON.stringify(fav));
+  } else if (op.action === 'planImport') {
+    // One request for a whole pasted note: dinners by date, plus favorites merged into any
+    // that already exist (existing ingredients kept; a missing link or cook filled in).
+    const days = op.days || {};
+    Object.keys(days).slice(0, 60).forEach(function (date) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !clean(days[date], 120)) return;
+      const key = 'PLAN:' + date;
+      const day = JSON.parse(PROPS.getProperty(key) || '{}');
+      PROPS.setProperty(key, JSON.stringify({ b: day.b || '', l: day.l || '', d: clean(days[date], 120) }));
+    });
+    (op.favs || []).slice(0, 150).forEach(function (f) {
+      const fav = cleanFav_(f);
+      if (!fav) return;
+      const key = 'FAV:' + fav.name.toLowerCase();
+      const old = JSON.parse(PROPS.getProperty(key) || 'null');
+      if (old) {
+        fav.name = old.name;
+        fav.items = old.items && old.items.length ? old.items : fav.items;
+        fav.link = old.link || fav.link;
+        fav.cooks = (old.cooks || []).concat(fav.cooks.filter(function (c) { return (old.cooks || []).indexOf(c) === -1; }));
+      }
+      PROPS.setProperty(key, JSON.stringify(fav));
+    });
+  } else if (op.action === 'favDelete') {
+    PROPS.deleteProperty('FAV:' + clean(op.name, 60).toLowerCase());
+  } else {
+    throw new Error('unknown action');
+  }
+}
+
+function cleanFav_(f) {
+  const clean = function (v, n) { return String(v || '').replace(/\s+/g, ' ').trim().slice(0, n); };
+  const name = clean(f && f.name, 60);
+  if (!name) return null;
+  const link = clean(f.link, 500);
+  return {
+    name: name,
+    link: /^https?:\/\/\S+$/.test(link) ? link : '',
+    cooks: (f.cooks || []).map(function (c) { return clean(c, 40); }).filter(Boolean).slice(0, 6),
+    items: (f.items || []).map(function (i) { return clean(i, 80); }).filter(Boolean).slice(0, 40)
+  };
 }
 
 function inboxFolder_() {

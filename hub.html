@@ -147,6 +147,36 @@
   .meal .lbl { font-size: 14px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: #c0613f; min-width: 104px; }
   .meal-tmrw { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); font-size: 16px; color: var(--muted); font-weight: 700; }
   .meal-tmrw b { color: var(--ink); }
+  .plan-btn { margin-left: auto; border: 0; background: var(--soft); border-radius: 10px; padding: 6px 12px; font-weight: 800; font-size: 14px; letter-spacing: 0; text-transform: none; color: var(--ink); }
+  .sheet.wide { width: min(1000px, 100%); }
+  .plan-row { display: grid; grid-template-columns: 110px minmax(0, 1fr) auto 48px; gap: 8px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--line); }
+  .plan-row.head { font-size: 13px; font-weight: 800; color: var(--muted); letter-spacing: .06em; text-transform: uppercase; padding-top: 0; }
+  .plan-row .dl { font-weight: 800; font-size: 16px; line-height: 1.15; }
+  .plan-row .dl small { display: block; font-size: 13px; color: var(--muted); font-weight: 700; }
+  .plan-row input { border: 2px solid var(--line); border-radius: 10px; padding: 9px 10px; font-size: 16px; font-weight: 600; background: #fff; width: 100%; min-width: 0; }
+  .plan-row input:focus { border-color: var(--ink); outline: none; }
+  .plan-row.today .dl { color: #c0613f; }
+  .cart { border: 0; background: var(--soft); border-radius: 10px; height: 42px; font-size: 18px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+  .chip { border: 2px solid var(--line); background: #fff; border-radius: 99px; padding: 6px 12px; font-weight: 700; font-size: 15px; }
+  .chip.new { border-style: dashed; color: var(--muted); }
+  .chip.mini { padding: 4px 10px; font-size: 13px; text-decoration: none; color: var(--ink); white-space: nowrap; }
+  .plan-info { display: flex; gap: 6px; }
+  .tonight { font-size: 24px; font-weight: 800; line-height: 1.25; }
+  .tonight small { display: block; font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: #c0613f; }
+  .rl { text-decoration: none; }
+  .cook { font-size: 13px; font-weight: 700; color: var(--muted); white-space: nowrap; }
+  .week-dinners { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--line); display: grid; gap: 4px; }
+  .week-dinners div { display: flex; gap: 10px; font-size: 16px; font-weight: 700; }
+  .week-dinners b { width: 38px; color: var(--muted); flex: none; }
+  .field textarea { border: 2px solid var(--line); border-radius: 10px; padding: 9px 10px; font-size: 15px; font-weight: 600; background: #fff; color: var(--ink); width: 100%; min-height: 150px; font-family: inherit; }
+  @media (max-width: 700px) {
+    .plan-row { grid-template-columns: 1fr 48px; }
+    .plan-row .dl { grid-column: 1 / -1; }
+    .plan-row input { grid-column: 1; }
+    .plan-row .cart { grid-column: 2; grid-row: 2; }
+    .plan-row .plan-info { grid-column: 1 / -1; }
+  }
   .hint { color: var(--muted); font-size: 16px; font-weight: 600; line-height: 1.45; }
 
   .list-add { display: flex; gap: 8px; margin-bottom: 8px; }
@@ -311,7 +341,7 @@
   const save = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
 
   const COLORS = ['#e76f51', '#2a9d8f', '#7c5cbf', '#e9a23b', '#3a86ff', '#d6457a'];
-  const DEFAULTS = { members: [], zip: '', idleMin: 10, photoSec: 20, days: 3, workFrom: 8, workTo: 17, nightFrom: 22, nightTo: 6, demo: false };
+  const DEFAULTS = { members: [], zip: '', idleMin: 10, photoSec: 20, days: 3, workFrom: 8, workTo: 17, weekStart: 5, nightFrom: 22, nightTo: 6, demo: false };
   const REFRESH_MS = 5 * 60 * 1000, PHOTO_REFRESH_MS = 60 * 60 * 1000, NIGHT_IDLE_MS = 2 * 60 * 1000;
 
   // Settings can arrive in a setup link someone texted, so treat every field as untrusted:
@@ -334,6 +364,7 @@
     c.photoSec = num(c.photoSec, 5, 600, DEFAULTS.photoSec);
     c.days = [3, 5, 7].includes(+c.days) ? +c.days : DEFAULTS.days;
     for (const k of ['nightFrom', 'nightTo', 'workFrom', 'workTo']) c[k] = num(c[k], 0, 23, DEFAULTS[k]);
+    c.weekStart = num(c.weekStart, 0, 6, DEFAULTS.weekStart);
     c.pinSalt = /^[0-9a-f]{32}$/.test(c.pinSalt || '') ? c.pinSalt : '';
     c.pinHash = /^[0-9a-f]{64}$/.test(c.pinHash || '') && c.pinSalt ? c.pinHash : '';
     c.demo = !!c.demo;
@@ -406,7 +437,7 @@
     }
   }
   const inFlight = new Set();
-  async function refreshAll(parts = ['calendar', 'meals', 'list']) {
+  async function refreshAll(parts = ['calendar', 'meals', 'list', 'plan']) {
     const tag = parts.join();
     if (inFlight.has(tag)) return;
     inFlight.add(tag);
@@ -441,6 +472,18 @@
         at: Date.now()
       }
     };
+  }
+  function demoPlan() {
+    const t = planWeekStart();
+    const menu = ['Chicken pot pie soup', 'Chicken poofies', 'Turkey dinner', 'Pepper steak', 'Slow cooker chicken and dumplings', 'Spaghetti', 'Goulash'];
+    const days = {};
+    menu.forEach((d, i) => { days[dayKey(addDays(t, i))] = { b: '', l: '', d }; });
+    return { days, favs: [
+      { name: 'Chicken pot pie soup', link: 'https://example.com/chicken-pot-pie-soup', cooks: [], items: ['Rotisserie chicken', 'Frozen mixed vegetables', 'Cream of chicken soup', 'Biscuits'] },
+      { name: 'Spaghetti', link: '', cooks: ['Dad'], items: ['Spaghetti', 'Marinara sauce', 'Ground beef', 'Parmesan'] },
+      { name: 'Goulash', link: '', cooks: ['Dad'], items: ['Elbow macaroni', 'Ground beef', 'Diced tomatoes', 'Tomato sauce'] },
+      { name: 'Pot roast', link: '', cooks: ['Dad'], items: [] }
+    ] };
   }
   const demoPhotos = () => Array.from({ length: 12 }, (_, i) => `https://picsum.photos/seed/familyhub${i}/1600/1000`);
   let demo = null;
@@ -519,7 +562,7 @@
       const w = wx?.days?.find(d => d.t === dayKey(day));
       const wxHtml = w ? `<div class="day-wx"><span class="ic">${WX(w.c)}</span>${w.hi}° <small>${w.lo}°</small></div>` : '';
       const dinner = days === 3 ? dinnerOn(day) : '';
-      const dinnerHtml = dinner ? `<div class="day-dinner"><b>Dinner</b>${esc(dinner)}</div>` : '';
+      const dinnerHtml = dinner ? `<div class="day-dinner"><b>Dinner</b>${esc(dinner)}${mealExtras(dinner)}</div>` : '';
       html += `<div class="day${i === 0 ? ' today' : ''}"><div class="day-head"><h3>${label}<b>${esc(big)}</b></h3>${wxHtml}</div>${dinnerHtml}
         <div class="evs">${body}<button class="add-ev" data-add="${dayKey(day)}">+ Add</button></div></div>`;
     }
@@ -571,45 +614,197 @@
     }
     return found ? byDay : null;
   }
-  function mealRow(item) {
-    const m = item.match(/^(breakfast|lunch|dinner|supper|snack|b|l|d)\s*[:\-–—]\s*(.+)$/i);
-    if (!m) return `<div class="meal"><span>${esc(item)}</span></div>`;
-    const lbl = { b: 'Breakfast', l: 'Lunch', d: 'Dinner' }[m[1].toLowerCase()] || m[1];
-    return `<div class="meal"><span class="lbl">${esc(lbl)}</span><span>${esc(m[2])}</span></div>`;
-  }
+
   function latestMealNote() {
     const notes = members().map(m => view()[m.id]?.meals).filter(x => x && x.text);
     notes.sort((a, b) => new Date(b.at) - new Date(a.at));
     return notes[0] || null;
   }
-  // That day's dinner (or the whole day's meals if nothing is labeled dinner).
+  /* ── Meal plan (stored in the first person's script, like the family list) ── */
+  const K_LOCAL_PLAN = 'hub.plan';
+  const cleanStr = (v, n) => String(v || '').replace(/\s+/g, ' ').trim().slice(0, n);
+  const safeLink = u => /^https?:\/\/\S+$/.test(u || '') ? u : '';
+  function cleanFav(f) {
+    const name = cleanStr(f?.name, 60);
+    if (!name) return null;
+    return {
+      name, link: safeLink(cleanStr(f.link, 500)),
+      cooks: (f.cooks || []).map(c => cleanStr(c, 40)).filter(Boolean).slice(0, 6),
+      items: (f.items || []).map(i => cleanStr(i, 80)).filter(Boolean).slice(0, 40)
+    };
+  }
+  function currentPlan() {
+    if (demoOn()) { view(); return demo.plan || (demo.plan = demoPlan()); }
+    const home = listHome();
+    const p = home ? data[home.id]?.plan : load(K_LOCAL_PLAN, null);
+    return { days: p?.days || {}, favs: p?.favs || [] };
+  }
+  // Mirrors applyPlanOp_ in hub-script.gs so the screen updates before the script answers.
+  function applyPlanOp(plan, op) {
+    const days = { ...plan.days };
+    const favs = new Map(plan.favs.map(f => [f.name.toLowerCase(), f]));
+    const setDinner = (date, text) => {
+      const day = { b: '', l: '', ...days[date], d: cleanStr(text, 120) };
+      if (day.b || day.l || day.d) days[date] = day; else delete days[date];
+    };
+    if (op.action === 'planSet' && op.slot === 'd') setDinner(op.date, op.text);
+    if (op.action === 'favSave') {
+      const f = cleanFav(op);
+      if (f) { if (op.oldName) favs.delete(op.oldName.toLowerCase()); favs.set(f.name.toLowerCase(), f); }
+    }
+    if (op.action === 'favDelete') favs.delete(op.name.toLowerCase());
+    if (op.action === 'planImport') {
+      for (const [date, text] of Object.entries(op.days)) if (cleanStr(text, 120)) setDinner(date, text);
+      for (const raw of op.favs) {
+        const f = cleanFav(raw), old = f && favs.get(f.name.toLowerCase());
+        if (!f) continue;
+        favs.set(f.name.toLowerCase(), old ? { ...old, link: old.link || f.link, items: old.items?.length ? old.items : f.items,
+          cooks: [...new Set([...(old.cooks || []), ...f.cooks])] } : f);
+      }
+    }
+    return { days, favs: [...favs.values()].sort((a, b) => a.name.localeCompare(b.name)) };
+  }
+  async function planOp(op) {
+    if (demoOn()) { demo.plan = applyPlanOp(currentPlan(), op); renderMealsEverywhere(); return; }
+    const home = listHome();
+    if (!home) { save(K_LOCAL_PLAN, applyPlanOp(currentPlan(), op)); renderMealsEverywhere(); return; }
+    const d = data[home.id] || (data[home.id] = {});
+    d.plan = applyPlanOp(currentPlan(), op);
+    renderMealsEverywhere();
+    try {
+      const j = await postScript(home, op);
+      d.plan = j.plan; save(K_DATA, data); renderMealsEverywhere();
+    } catch (e) {
+      toast(e.message === 'unknown action' ? 'Update the Google script to the latest version first (see README).' : `Couldn't save the meal plan (${e.message}).`);
+    }
+  }
+  function renderMealsEverywhere() { renderMeals(); renderWeek(); }
+
+  /* Reads a pasted meals note in the shape Carolyn keeps it:
+       9/25                     ← a week starting that day
+       Friday- Chicken pot pie soup
+       ...
+       Chicken pot pie soup https://…      ← a recipe (name and link on one line)
+       Zero carb garlic bread              ← or the name, then the link on the next line
+       https://…
+       Meals Scott can cook                ← names below are tagged with that cook
+       Chili
+     Links with no name nearby can't be identified, so they're counted, not imported. */
+  function parseNoteImport(text) {
+    const days = {}, favs = new Map(), unnamed = new Set();
+    let week = null, pending = null, cook = '';
+    const addFav = (name, link = '') => {
+      name = cleanStr(name.replace(/[\s:\-–—]+$/, ''), 60);
+      if (!name) return;
+      const k = name.toLowerCase(), f = favs.get(k) || { name, link: '', cooks: [], items: [] };
+      if (link && !f.link) f.link = link;
+      if (cook && !f.cooks.includes(cook)) f.cooks.push(cook);
+      favs.set(k, f);
+    };
+    const flush = () => { if (pending) addFav(pending); pending = null; };
+    for (const raw of String(text || '').split(/\r?\n/)) {
+      const line = raw.replace(/^[\s\-•*◦▪︎]+/, '').trim();
+      if (!line) continue;
+      const date = line.match(/^(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?$/);
+      if (date) { flush(); week = resolveDate(+date[1], +date[2], date[3]); cook = ''; continue; }
+      const wd = week && line.match(DAY_RE);
+      if (wd) {
+        const meal = line.slice(wd[0].length).replace(/^[\s:–—\-.,)]+/, '').trim();
+        if (meal) days[dayKey(onOrAfter(week, DAY_IDX[wd[1].slice(0, 3).toLowerCase()]))] = meal;
+        continue;
+      }
+      week = null;
+      const who = line.match(/^meals?\s+(\w+)\s+can\s+(cook|make)/i);
+      if (who) { flush(); cook = who[1][0].toUpperCase() + who[1].slice(1).toLowerCase(); continue; }
+      if (/^this week'?s menu$/i.test(line)) continue;
+      const url = line.match(/https?:\/\/\S+/);
+      if (url) {
+        const before = line.slice(0, url.index).trim();
+        if (before) { flush(); addFav(before, url[0]); }
+        else if (pending) { addFav(pending, url[0]); pending = null; }
+        else if (slugName(url[0])) addFav(slugName(url[0]), url[0]);
+        else unnamed.add(url[0].replace(/[?#].*$/, ''));
+        continue;
+      }
+      if (cook) { addFav(line); continue; }
+      flush();
+      pending = line;
+    }
+    flush();
+    return { days, favs: [...favs.values()], unnamed: unnamed.size };
+  }
+  // "https://site.com/ditalini-pasta-with-bacon-and-peas/" → "Ditalini pasta with bacon and peas"
+  function slugName(url) {
+    try {
+      const u = new URL(url);
+      if (/facebook|fb\.|youtu|instagram|tiktok/.test(u.hostname)) return '';
+      const slug = u.pathname.split('/').filter(Boolean).pop() || '';
+      const words = slug.replace(/\.\w+$/, '').split('-').filter(w => /^[a-z]+$/i.test(w));
+      return words.length >= 2 ? words.join(' ').replace(/^./, c => c.toUpperCase()) : '';
+    } catch { return ''; }
+  }
+  // A month/day with no year: the year that puts it closest to today.
+  function resolveDate(m, d, y) {
+    if (y) return new Date(+y < 100 ? 2000 + +y : +y, m - 1, d);
+    const now = new Date(), cands = [-1, 0, 1].map(k => new Date(now.getFullYear() + k, m - 1, d));
+    return cands.sort((a, b) => Math.abs(a - now) - Math.abs(b - now))[0];
+  }
+  const onOrAfter = (start, dow) => addDays(start, (dow - start.getDay() + 7) % 7);
+  let noteCache = { text: null, parsed: null };
+  function noteImport(note) {
+    if (noteCache.text !== note.text) noteCache = { text: note.text, parsed: parseNoteImport(note.text) };
+    return noteCache.parsed;
+  }
+
+  // A day's dinner: the planner wins; otherwise the Apple Note, if there still is one.
   function dinnerOn(day) {
+    const planned = currentPlan().days[dayKey(day)]?.d;
+    if (planned) return planned;
     const note = latestMealNote();
-    const items = note && parseMeals(note.text)?.[day.getDay()];
-    if (!items?.length) return '';
+    if (!note) return '';
+    const dated = noteImport(note).days[dayKey(day)];
+    if (dated) return dated;
+    const items = parseMeals(note.text)?.[day.getDay()];
+    if (!items?.length || Object.keys(noteImport(note).days).length) return '';
     const d = items.find(x => /^(dinner|supper|d)\s*[:\-–—]/i.test(x));
     return d ? d.replace(/^(dinner|supper|d)\s*[:\-–—]\s*/i, '') : items.join(' · ');
   }
+  // Matches a planned dinner to a favorite, ignoring case, emoji and punctuation, and allowing one
+  // letter's difference in longer names ("Ghoulash 👻" → "Goulash").
+  const normMeal = n => String(n || '').toLowerCase().normalize('NFKD').replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+  function oneEditApart(a, b) {
+    if (Math.abs(a.length - b.length) > 1) return false;
+    let i = 0, j = 0, edits = 0;
+    while (i < a.length && j < b.length) {
+      if (a[i] === b[j]) { i++; j++; continue; }
+      if (++edits > 1) return false;
+      if (a.length > b.length) i++; else if (b.length > a.length) j++; else { i++; j++; }
+    }
+    return edits + (a.length - i) + (b.length - j) <= 1;
+  }
+  function favFor(name, favs = currentPlan().favs) {
+    const n = normMeal(name);
+    if (!n) return undefined;
+    return favs.find(f => normMeal(f.name) === n) || (n.length >= 6 ? favs.find(f => oneEditApart(normMeal(f.name), n)) : undefined);
+  }
+  // 🔗 recipe and 👨‍🍳 cook markers for a meal that matches a favorite.
+  function mealExtras(name) {
+    const f = name && favFor(name);
+    if (!f) return '';
+    const link = safeLink(f.link);
+    return (link ? ` <a class="rl" href="${esc(link)}" target="_blank" rel="noopener noreferrer" title="Open the recipe">🔗</a>` : '') +
+      (f.cooks?.length ? ` <span class="cook" title="${esc(f.cooks.join(', '))} can cook this">👨‍🍳 ${esc(f.cooks.join(', '))}</span>` : '');
+  }
+  const planWeekStart = (d = new Date()) => addDays(startOfDay(d), -((d.getDay() - (+cfg.weekStart) + 7) % 7));
 
   function renderMeals() {
     const el = $('#meals');
-    const note = latestMealNote();
-    if (!note) {
-      el.innerHTML = `<h2>🍽️ Meals</h2><div class="hint">Nothing yet. Once the iPhone Shortcut runs, the meals note shows up here — see the README.</div>`;
-      return;
-    }
-    const byDay = parseMeals(note.text);
-    const stamp = note.at ? `<span class="aside">updated ${ago(new Date(note.at).getTime())}</span>` : '';
-    if (!byDay) {
-      const lines = note.text.split(/\r?\n/).map(s => s.trim()).filter(Boolean).slice(0, 12);
-      el.innerHTML = `<h2>🍽️ Meals${stamp}</h2>${lines.map(mealRow).join('')}`;
-      return;
-    }
-    const d = new Date().getDay();
-    const today = byDay[d] || [], tmrw = byDay[(d + 1) % 7] || [];
-    el.innerHTML = `<h2>🍽️ Today's meals${stamp}</h2>
-      ${today.length ? today.map(mealRow).join('') : '<div class="hint">Nothing in the note for today.</div>'}
-      ${tmrw.length ? `<div class="meal-tmrw">Tomorrow: <b>${esc(tmrw.join(' · '))}</b></div>` : ''}`;
+    const today = startOfDay(new Date()), tonight = dinnerOn(today);
+    const rest = Array.from({ length: 6 }, (_, i) => addDays(today, i + 1)).map(d => [d, dinnerOn(d)]).filter(([, m]) => m);
+    el.innerHTML = `<h2>🍽️ Dinner<button class="plan-btn" data-act="planner">Plan dinners</button></h2>
+      ${tonight ? `<div class="tonight"><small>Tonight</small>${esc(tonight)}${mealExtras(tonight)}</div>`
+        : '<div class="hint">Nothing planned for tonight. Tap <b>Plan dinners</b> to fill in the week.</div>'}
+      ${rest.length ? `<div class="week-dinners">${rest.map(([d, m]) => `<div><b>${d.toLocaleDateString([], { weekday: 'short' })}</b><span>${esc(m)}</span></div>`).join('')}</div>` : ''}`;
   }
 
   /* ── Family list ── */
@@ -617,6 +812,7 @@
     const now = Date.now();
     list = list.map(i => ({ ...i }));
     if (op.action === 'listAdd' && op.text && !list.some(i => i.id === op.id)) list.push({ id: op.id, text: op.text, done: false, at: now });
+    if (op.action === 'listAddMany') for (const it of op.items) if (!list.some(i => i.id === it.id)) list.push({ id: it.id, text: it.text, done: false, at: now });
     if (op.action === 'listToggle') list.forEach(i => { if (i.id === op.id) { i.done = !i.done; i.at = now; } });
     if (op.action === 'listClearDone') list = list.filter(i => !i.done);
     return list;
@@ -948,8 +1144,131 @@
     if (ev.guests.length) DEMO_MEMBERS.filter(m => m !== who).forEach(m => demo[m.id].calendar.push(out));
   }
 
+  /* ── Dinner planner ── */
+  let plannerWeek = 0;
+  const isLeftovers = n => /^(left ?overs?|eat(ing)? out|take ?out|take-out|out|fend for yourself|ffy)$/i.test(String(n).trim());
+  function planInfo(name) {
+    const f = name && favFor(name);
+    if (!f) return '';
+    const link = safeLink(f.link);
+    return (link ? `<a class="chip mini" href="${esc(link)}" target="_blank" rel="noopener noreferrer">🔗 Recipe</a>` : '') +
+      (f.cooks?.length ? `<span class="chip mini">👨‍🍳 ${esc(f.cooks.join(', '))}</span>` : '');
+  }
+  function openPlanner(week = plannerWeek) {
+    plannerWeek = week;
+    const { favs } = currentPlan();
+    const start = addDays(planWeekStart(), week * 7);
+    const dates = Array.from({ length: 7 }, (_, i) => addDays(start, i));
+    const todayKey = dayKey(new Date());
+    const rows = dates.map(d => {
+      const key = dayKey(d), meal = dinnerOn(d);
+      const fromNote = !currentPlan().days[key]?.d && meal;
+      return `<div class="plan-row${key === todayKey ? ' today' : ''}">
+        <div class="dl">${key === todayKey ? 'Today' : d.toLocaleDateString([], { weekday: 'long' })}<small>${d.toLocaleDateString([], { month: 'short', day: 'numeric' })}</small></div>
+        <input data-date="${key}" data-slot="d" value="${esc(meal)}" placeholder="Dinner" list="fav-names" autocomplete="off" maxlength="120"${fromNote ? ' data-note="1"' : ''}>
+        <div class="plan-info" data-info="${key}">${planInfo(meal)}</div>
+        <button class="cart" data-cart="${key}" title="Add this dinner's ingredients to the list" aria-label="Add ingredients to the list">🛒</button>
+      </div>`;
+    }).join('');
+    const planned = [...new Set(dates.map(d => dinnerOn(d)).filter(n => n && !isLeftovers(n)))];
+    const unsaved = planned.filter(n => !favFor(n, favs)).slice(0, 7);
+    const range = `${start.toLocaleDateString([], { month: 'short', day: 'numeric' })} – ${addDays(start, 6).toLocaleDateString([], { month: 'short', day: 'numeric' })}`;
+    openSheet(`
+      <h2>Dinners <span class="hint" style="font-size:18px">${range}</span></h2>
+      <div class="hint">Type a dinner or pick a favorite. Changes save as you go and show on every screen.</div>
+      <datalist id="fav-names">${favs.map(f => `<option value="${esc(f.name)}">`).join('')}</datalist>
+      <div class="actions" style="justify-content:flex-start;margin:14px 0 6px">
+        <button type="button" class="btn ${week === 0 ? '' : 'ghost'}" data-week="0">This week</button>
+        <button type="button" class="btn ${week === 1 ? '' : 'ghost'}" data-week="1">Next week</button>
+        <button type="button" class="btn ghost" data-week="2">Week after</button>
+      </div>
+      ${rows}
+      <h3>Favorites (${favs.length})</h3>
+      <div class="hint">A favorite keeps the recipe link, who can cook it, and what to buy. 🛒 puts those ingredients on the family list.</div>
+      <div class="chips">
+        ${favs.map(f => `<button class="chip" data-fav="${esc(f.name)}">${f.cooks?.length ? '👨‍🍳' : '⭐'} ${esc(f.name)}</button>`).join('')}
+        ${unsaved.map(n => `<button class="chip new" data-newfav="${esc(n)}">＋ ${esc(n)}</button>`).join('')}
+        <button class="chip new" data-newfav="">＋ New favorite</button>
+      </div>
+      <div class="actions">
+        <button type="button" class="btn ghost" data-act="import" style="margin-right:auto">Import from the Notes app</button>
+        <button type="button" class="btn ghost" data-cart-week="${dates.map(dayKey).join(',')}">🛒 Add the week's groceries</button>
+        <button type="button" class="btn" data-act="close">Done</button>
+      </div>`, true);
+  }
+  function openFavorite(name, isNew) {
+    const f = !isNew && favFor(name);
+    const cooks = [...new Set([...members().map(m => m.name), ...(f?.cooks || [])])].filter(Boolean);
+    openSheet(`
+      <h2>${f ? 'Edit favorite' : 'New favorite'}</h2>
+      <form id="fav-form" style="display:grid;gap:14px;margin-top:14px">
+        <label class="field">Dinner<input id="fav-name" value="${esc(f ? f.name : name)}" maxlength="60" required autocomplete="off" placeholder="e.g. Chicken pot pie soup"></label>
+        <label class="field">Recipe link (optional)<input id="fav-link" type="url" value="${esc(f?.link || '')}" maxlength="500" placeholder="https://…" autocomplete="off"></label>
+        ${cooks.length ? `<div class="field">Who can cook it<div class="chips" style="margin-top:4px">${cooks.map(c => `<label class="check" style="margin-right:14px"><input type="checkbox" class="fav-cook" value="${esc(c)}"${f?.cooks?.includes(c) ? ' checked' : ''}> ${esc(c)}</label>`).join('')}</div></div>` : ''}
+        <label class="field">Ingredients to buy, one per line<textarea id="fav-items" placeholder="Rotisserie chicken&#10;Frozen mixed vegetables&#10;Cream of chicken soup">${esc(f ? f.items.join('\n') : '')}</textarea></label>
+        <div class="actions" style="margin-top:0">
+          ${f ? `<button type="button" class="btn danger" data-favdel="${esc(f.name)}" style="margin-right:auto">Delete</button>` : ''}
+          <button type="button" class="btn ghost" data-act="planner">Back</button>
+          <button class="btn">Save</button>
+        </div>
+      </form>`);
+    $('#fav-form').addEventListener('submit', e => {
+      e.preventDefault();
+      const newName = $('#fav-name').value.trim(), link = $('#fav-link').value.trim();
+      if (!newName) return;
+      if (link && !safeLink(link)) { toast('The recipe link should start with https://'); return; }
+      planOp({ action: 'favSave', name: newName, oldName: f ? f.name : '', link,
+        cooks: $$('.fav-cook').filter(c => c.checked).map(c => c.value), items: $('#fav-items').value.split('\n') });
+      openPlanner();
+    });
+  }
+  function openImport() {
+    openSheet(`
+      <h2>Import from the Notes app</h2>
+      <div class="hint">In Notes, open the meals note, select all, copy, and paste it here. Dated weeks ("9/25" then "Friday- …") fill the planner. Named recipes and links become favorites. A "Meals Scott can cook" list tags who can cook each one. Nothing is saved until you tap Import.</div>
+      <label class="field" style="margin-top:14px">The note<textarea id="imp-text" style="min-height:220px" placeholder="Paste the whole note here"></textarea></label>
+      <div class="hint" id="imp-sum" style="margin-top:10px"></div>
+      <div class="actions">
+        <button type="button" class="btn ghost" data-act="planner">Back</button>
+        <button type="button" class="btn" id="imp-go" disabled>Import</button>
+      </div>`, true);
+    let parsed = null;
+    $('#imp-text').addEventListener('input', e => {
+      parsed = parseNoteImport(e.target.value);
+      const n = Object.keys(parsed.days).length, sorted = Object.keys(parsed.days).sort();
+      const cooks = parsed.favs.filter(f => f.cooks.length).length;
+      $('#imp-sum').innerHTML = !n && !parsed.favs.length ? 'Nothing recognized yet.' :
+        `<b>${n}</b> dinner${n === 1 ? '' : 's'}${n ? ` (${parseDay(sorted[0]).toLocaleDateString([], { month: 'short', day: 'numeric' })} – ${parseDay(sorted.at(-1)).toLocaleDateString([], { month: 'short', day: 'numeric' })})` : ''} ·
+         <b>${parsed.favs.length}</b> favorites (${parsed.favs.filter(f => f.link).length} with a recipe link${cooks ? `, ${cooks} tagged with a cook` : ''})` +
+        (parsed.unnamed ? ` · <b>${parsed.unnamed}</b> links with no name skipped. Open those in Notes and add them as favorites if you want them.` : '');
+      $('#imp-go').disabled = !n && !parsed.favs.length;
+    });
+    $('#imp-go').addEventListener('click', () => {
+      if (!parsed) return;
+      planOp({ action: 'planImport', days: parsed.days, favs: parsed.favs });
+      toast(`Imported ${Object.keys(parsed.days).length} dinners and ${parsed.favs.length} favorites.`);
+      openPlanner(0);
+    });
+  }
+  // Ingredients for the favorites planned on these days, minus anything already on the list.
+  function addGroceries(keys) {
+    const favs = currentPlan().favs;
+    const have = new Set(currentList().filter(i => !i.done).map(i => i.text.toLowerCase()));
+    const want = [], missing = new Set();
+    for (const k of keys) {
+      const meal = dinnerOn(parseDay(k));
+      if (!meal || isLeftovers(meal)) continue;
+      const f = favFor(meal, favs);
+      if (!f || !f.items?.length) { missing.add(meal); continue; }
+      for (const it of f.items) if (!have.has(it.toLowerCase())) { have.add(it.toLowerCase()); want.push(it); }
+    }
+    if (want.length) listOp({ action: 'listAddMany', items: want.map(text => ({ id: uid(), text })) });
+    const note = missing.size ? ` No ingredients saved yet for ${[...missing].slice(0, 3).join(', ')}${missing.size > 3 ? '…' : ''}. Tap it under Favorites to add them.` : '';
+    toast(want.length ? `Added ${want.length} item${want.length === 1 ? '' : 's'} to the list.${note}` : `Nothing new to add.${note}`);
+  }
+
   /* ── Sheets: settings, event details ── */
-  function openSheet(html) { $('#sheet').innerHTML = html; $('#modal').hidden = false; }
+  function openSheet(html, wide = false) { $('#sheet').innerHTML = html; $('#sheet').classList.toggle('wide', wide); $('#modal').hidden = false; }
   function closeSheet() { $('#modal').hidden = true; $('#sheet').innerHTML = ''; }
 
   let draft = null;
@@ -1030,6 +1349,7 @@
         <label class="field">…and wakes at<select id="s-nt">${hours(draft.nightTo)}</select></label>
         <label class="field">Work day starts<select id="s-wf">${hours(draft.workFrom)}</select></label>
         <label class="field">…and ends<select id="s-wt">${hours(draft.workTo)}</select></label>
+        <label class="field">Dinner weeks start on<select id="s-ws">${['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map((d, i) => `<option value="${i}"${+draft.weekStart === i ? ' selected' : ''}>${d}</option>`).join('')}</select></label>
       </div>
       <h3>Lock settings</h3>
       <div class="hint">A PIN keeps anyone at the tablet from seeing the keys or changing where the hub sends things. ${cfg.pinHash ? 'A PIN is set.' : 'No PIN yet.'}</div>
@@ -1057,6 +1377,7 @@
     draft.days = +$('#s-days').value;
     draft.workFrom = +$('#s-wf').value;
     draft.workTo = +$('#s-wt').value;
+    draft.weekStart = +$('#s-ws').value;
     draft.nightFrom = +$('#s-nf').value;
     draft.nightTo = +$('#s-nt').value;
   }
@@ -1095,6 +1416,18 @@
   document.addEventListener('click', async e => {
     const t = e.target;
     if (t.id === 'modal') { closeSheet(); return; }
+    const wk = t.closest('[data-week]');
+    if (wk) { openPlanner(+wk.dataset.week); return; }
+    const cart = t.closest('[data-cart]');
+    if (cart) { addGroceries([cart.dataset.cart]); return; }
+    const cartWeek = t.closest('[data-cart-week]');
+    if (cartWeek) { addGroceries(cartWeek.dataset.cartWeek.split(',')); return; }
+    const fav = t.closest('[data-fav]');
+    if (fav) { openFavorite(fav.dataset.fav, false); return; }
+    const newFav = t.closest('[data-newfav]');
+    if (newFav) { openFavorite(newFav.dataset.newfav, true); return; }
+    const favDel = t.closest('[data-favdel]');
+    if (favDel) { if (confirm(`Delete the favorite "${favDel.dataset.favdel}"?`)) { planOp({ action: 'favDelete', name: favDel.dataset.favdel }); openPlanner(); } return; }
     const add = t.closest('[data-add]');
     if (add) { openAddEvent(add.dataset.add); return; }
     const ev = t.closest('[data-ev]');
@@ -1112,6 +1445,8 @@
     if (!act) return;
     if (act === 'settings') openSettings();
     if (act === 'close') closeSheet();
+    if (act === 'planner') openPlanner();
+    if (act === 'import') openImport();
     if (act === 'snap-again') { closeSheet(); openSnap(); }
     if (act === 'snap-send') sendSnap(t.closest('button'));
     if (act === 'demo') { cfg.demo = true; save(K_CFG, cfg); render(); }
@@ -1160,6 +1495,16 @@
       try { await navigator.clipboard.writeText(link); toast('Setup link copied'); }
       catch { prompt('Copy this link:', link); }
     }
+  });
+
+  // Planner cells save when you leave them (or pick a favorite from the suggestions).
+  document.addEventListener('change', e => {
+    const inp = e.target.closest?.('[data-slot]');
+    if (!inp) return;
+    planOp({ action: 'planSet', date: inp.dataset.date, slot: 'd', text: inp.value });
+    delete inp.dataset.note;
+    const info = $(`[data-info="${inp.dataset.date}"]`);
+    if (info) info.innerHTML = planInfo(inp.value);
   });
 
   document.addEventListener('submit', e => {
