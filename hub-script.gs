@@ -6,7 +6,7 @@
  * nobody shares a password and nothing is stored anywhere but their own Google account.
  *
  * Setup (once per person — full walkthrough in README.md):
- *   1. Paste this file, then fill in ICLOUD_ALBUM or PHOTO_FOLDER_ID below if you want photos (optional).
+ *   1. Paste this file. (Photos are set later from the hub's Settings; nothing to edit here.)
  *   2. Run `setup` from the toolbar, allow the permissions, and copy the key from the log.
  *   3. Deploy → New deployment → Web app. Execute as: Me. Who has access: Anyone.
  *   4. Put the /exec URL and the key into the hub's Settings.
@@ -19,6 +19,9 @@
  * APS email) and puts the dates on the calendar — see README.md.
  */
 
+// Photos are normally set from the hub: Settings → your name → Photo album. The two values
+// below are only a fallback if you'd rather type them here.
+//
 // Optional: the ID of a Google Drive folder of family photos (the part of the folder's URL
 // after /folders/). Share that folder as "Anyone with the link can view" so the tablet can
 // load the images. Leave empty for no photos.
@@ -55,6 +58,7 @@ function setup() {
   }
   CalendarApp.getDefaultCalendar();
   if (PHOTO_FOLDER_ID) DriveApp.getFolderById(PHOTO_FOLDER_ID).getName();
+  DriveApp.getRootFolder();
   inboxFolder_();
   Logger.log('Your hub key: ' + key);
 }
@@ -98,6 +102,10 @@ function doPost(e) {
       const text = String(body.text || '').slice(0, 8000);
       PROPS.setProperty('MEALS', JSON.stringify({ text: text, at: new Date().toISOString() }));
       return json_({ ok: true, meals: meals_() });
+    }
+    if (body.action === 'photoSource') {
+      try { return json_(Object.assign({ ok: true }, setPhotoSource_(body.link))); }
+      catch (err) { return json_({ error: String(err.message || err) }); }
     }
     if (body.action === 'addEvent') {
       try { addEvent_(body); } catch (err) { return json_({ error: String(err.message || err) }); }
@@ -202,19 +210,54 @@ function applyListOp_(list, op) {
   return list.slice(-LIST_MAX);
 }
 
+// The album chosen in the hub's Settings wins over the constants above.
+function photoSource_() {
+  return {
+    icloud: PROPS.getProperty('ICLOUD_ALBUM') || ICLOUD_ALBUM,
+    folder: PROPS.getProperty('PHOTO_FOLDER_ID') || PHOTO_FOLDER_ID
+  };
+}
+
 function photos_() {
+  const src = photoSource_();
   let out = [];
-  if (PHOTO_FOLDER_ID) out = out.concat(drivePhotos_());
-  if (ICLOUD_ALBUM) out = out.concat(icloudPhotos_(ICLOUD_ALBUM));
+  if (src.folder) out = out.concat(drivePhotos_(src.folder));
+  if (src.icloud) out = out.concat(icloudPhotos_(src.icloud));
   return out;
 }
 
-function drivePhotos_() {
+// Set from the hub: an iCloud Shared Album link, a Google Drive folder link, or blank to turn
+// photos off. The new album is read once straight away so a bad link is reported, not saved.
+function setPhotoSource_(link) {
+  link = String(link || '').trim();
+  const folder = link.match(/drive\.google\.com\/(?:drive\/(?:u\/\d+\/)?folders\/|open\?id=)([\w-]{10,})/);
+  CacheService.getScriptCache().remove('photos');
+  if (!link) {
+    PROPS.deleteProperty('ICLOUD_ALBUM');
+    PROPS.deleteProperty('PHOTO_FOLDER_ID');
+    return { kind: 'none', count: 0 };
+  }
+  if (/icloud\.com\/sharedalbum\/#[A-Za-z0-9]{10,}/.test(link)) {
+    const count = icloudPhotos_(link).length;
+    PROPS.setProperty('ICLOUD_ALBUM', link);
+    PROPS.deleteProperty('PHOTO_FOLDER_ID');
+    return { kind: 'icloud', count: count };
+  }
+  if (folder) {
+    const count = drivePhotos_(folder[1]).length;
+    PROPS.setProperty('PHOTO_FOLDER_ID', folder[1]);
+    PROPS.deleteProperty('ICLOUD_ALBUM');
+    return { kind: 'drive', count: count };
+  }
+  throw new Error('That isn\'t an iCloud Shared Album link (…icloud.com/sharedalbum/#…) or a Google Drive folder link');
+}
+
+function drivePhotos_(folderId) {
   const cache = CacheService.getScriptCache();
   const hit = cache.get('photos');
   if (hit) return JSON.parse(hit);
   const ids = [];
-  const files = DriveApp.getFolderById(PHOTO_FOLDER_ID).getFiles();
+  const files = DriveApp.getFolderById(folderId).getFiles();
   while (files.hasNext() && ids.length < 1000) {
     const f = files.next();
     if (/^image\//.test(f.getMimeType())) ids.push(f.getId());

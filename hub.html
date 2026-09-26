@@ -1338,6 +1338,13 @@
         <label class="field">Script URL (ends in /exec)<input data-f="url" value="${esc(m.url)}" placeholder="https://script.google.com/macros/s/…/exec" inputmode="url"></label>
         <label class="field">Key<input data-f="key" type="password" autocomplete="off" value="${esc(m.key)}" placeholder="from the script's setup log"></label>
         <label class="field">Google email (so others can invite them to events)<input data-f="email" value="${esc(m.email || '')}" placeholder="name@gmail.com" inputmode="email"></label>
+        <div class="field">Photo album for the frame (optional)
+          <div style="display:flex;gap:8px">
+            <input class="photo-src" placeholder="iCloud Shared Album or Google Drive folder link" autocomplete="off" inputmode="url" style="flex:1">
+            <button type="button" class="btn ghost" data-act="photo-src">Use album</button>
+          </div>
+          <span class="hint photo-out" style="font-size:14px">Paste the album's link and tap Use album. It's saved in this person's Google script, not on this screen. Leave it blank and tap Use album to turn photos off.</span>
+        </div>
         <label class="field">Work email (gets a private invite for anything during work hours)<input data-f="workEmail" value="${esc(m.workEmail || '')}" placeholder="name@company.com" inputmode="email"></label>
         <div class="member-foot">
           <button type="button" class="btn ghost" data-act="test">Test connection</button>
@@ -1474,6 +1481,22 @@
       readSettingsForm();
       draft.members.splice(+t.closest('.member').dataset.i, 1);
       renderSettings();
+    }
+    if (act === 'photo-src') {
+      readSettingsForm();
+      const box = t.closest('.member'), out = $('.photo-out', box), m = draft.members[+box.dataset.i];
+      if (!m.url || !m.key) { out.textContent = 'Fill in the script URL and key first.'; return; }
+      out.textContent = 'Checking the album…';
+      try {
+        const j = await postScript(m, { action: 'photoSource', link: $('.photo-src', box).value.trim() });
+        out.textContent = j.kind === 'none' ? '✓ Photos turned off.'
+          : `✓ ${j.count} photo${j.count === 1 ? '' : 's'} found in the ${j.kind === 'icloud' ? 'iCloud album' : 'Drive folder'}. The frame will use them.`;
+        $('.photo-src', box).value = '';
+        if (cfg.members.some(x => x.id === m.id)) refreshAll(['photos']);
+      } catch (err) {
+        out.textContent = err.message === 'unknown action' ? '✗ Update the Google script to the latest version first (see README).' : `✗ ${err.message}`;
+      }
+      return;
     }
     if (act === 'test') {
       readSettingsForm();

@@ -230,7 +230,9 @@ phone as usual, and they show on the hub's photo frame within the hour.
 1. On an iPhone, in **Photos**, open the shared album (or create one under **Albums → + → New
    Shared Album**).
 2. Tap the **People** icon, turn on **Public Website**, and tap **Share Link** → **Copy**.
-3. In the script, paste that link into `ICLOUD_ALBUM`, then save and publish a new version.
+3. On the hub: **⚙️ → your name → Photo album**, paste the link, and tap **Use album**. It
+   reads the album right away and tells you how many photos it found, or what's wrong. The link
+   is saved in your Google script, not on the tablet, and nobody has to edit the script.
 
 Videos are skipped. With Public Website on, anyone who has the album link can see the photos,
 the same as a Drive folder shared by link. The link is only in your script, never in this
@@ -238,11 +240,14 @@ repository. The hub reads the album the way Apple's album web page does. Apple d
 document that, so if Apple ever changes it, the Drive option below still works.
 
 **Google Drive folder.** Put pictures in a Drive folder, share it as **Anyone with the link →
-Viewer**, and paste the folder's ID (`drive.google.com/drive/folders/THIS_PART`) into
-`PHOTO_FOLDER_ID`. Google Photos can't be used, because it no longer lets outside apps read your library.
+Viewer**, and paste its link into **Photo album** in Settings the same way (the folder's link works as-is). Google Photos can't be
+used, because it no longer lets outside apps read your library.
 
-You can use both: the frame mixes them. If both of you set a photo source in your own
-scripts, both show.
+Each script holds one album or folder at a time. Leave the box blank and tap **Use album** to
+turn photos off. `ICLOUD_ALBUM` and `PHOTO_FOLDER_ID` at the top of the script still work if
+you'd rather type the link there, but Settings takes priority.
+
+If both of you set an album in your own scripts, the frame mixes them.
 
 ### 4. The tablet
 
