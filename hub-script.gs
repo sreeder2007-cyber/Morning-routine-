@@ -77,7 +77,7 @@ function doGet(e) {
   const p = (e && e.parameter) || {};
   if (!authorized_(p.key)) return json_({ error: 'bad key' });
   const parts = String(p.parts || 'calendar,meals,list').split(',');
-  const readers = { calendar: calendar_, meals: meals_, list: list_, photos: photos_, plan: plan_ };
+  const readers = { calendar: calendar_, meals: meals_, list: list_, photos: photos_, plan: plan_, upcoming: upcoming_, kid: kid_ };
   const out = { ok: true, errors: {} };
   parts.forEach(function (part) {
     if (!readers[part]) return;
@@ -121,6 +121,10 @@ function doPost(e) {
       const file = inboxFolder_().createFile(Utilities.newBlob(bytes, 'image/jpeg', name));
       return json_({ ok: true, name: file.getName() });
     }
+    if (/^kid/.test(body.action)) {
+      try { applyKidOp_(body); } catch (err) { return json_({ error: String(err.message || err) }); }
+      return json_({ ok: true, kid: kid_() });
+    }
     if (/^(plan|fav)/.test(body.action)) {
       try { applyPlanOp_(body); } catch (err) { return json_({ error: String(err.message || err) }); }
       return json_({ ok: true, plan: plan_() });
@@ -145,20 +149,18 @@ function json_(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
 }
 
-function calendar_() {
-  const tz = Session.getScriptTimeZone();
-  const start = new Date();
-  start.setHours(0, 0, 0, 0);
-  const end = new Date(start);
-  end.setDate(end.getDate() + DAYS_AHEAD);
-
-  const cals = CALENDAR_IDS.length
+function calendarsToShow_() {
+  return CALENDAR_IDS.length
     ? CALENDAR_IDS.map(function (id) { return id === 'primary' ? CalendarApp.getDefaultCalendar() : CalendarApp.getCalendarById(id); }).filter(Boolean)
     : CalendarApp.getAllCalendars().filter(function (c) { return c.isSelected() && !c.isHidden(); });
+}
 
+function eventsBetween_(start, end, keep) {
+  const tz = Session.getScriptTimeZone();
   const events = [];
-  cals.forEach(function (cal) {
+  calendarsToShow_().forEach(function (cal) {
     cal.getEvents(start, end).forEach(function (ev) {
+      if (keep && !keep(ev.getTitle() || '')) return;
       const allDay = ev.isAllDayEvent();
       events.push({
         id: ev.getId(),
@@ -175,6 +177,58 @@ function calendar_() {
     });
   });
   return events;
+}
+
+function calendar_() {
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  return eventsBetween_(start, new Date(start.getTime() + DAYS_AHEAD * 864e5));
+}
+
+// Big events further ahead, for the countdowns on Paul's view. Filtered here so only a
+// handful of events travel (the hub decides which three to show).
+const COUNTDOWN_DAYS = 150;
+const MAJOR_EVENT = /⭐|🎂|birthday|no school|home day|\bbreak\b|vacation|\btrip\b|halloween|thanksgiving|christmas day|new year'?s day|easter sunday|valentine|independence day/i;
+function upcoming_() {
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  return eventsBetween_(start, new Date(start.getTime() + COUNTDOWN_DAYS * 864e5), function (t) { return MAJOR_EVENT.test(t); }).slice(0, 80);
+}
+
+/* ── Paul's jobs ──
+ * KID_TASKS → [{id, icon, label, when: daily|school|home|date, date}]
+ * KID_DONE:yyyy-MM-dd → [task ids checked off that day], kept for a week. */
+function kid_() {
+  const all = PROPS.getProperties();
+  const done = {};
+  Object.keys(all).forEach(function (k) { if (k.indexOf('KID_DONE:') === 0) done[k.slice(9)] = JSON.parse(all[k]); });
+  return { tasks: JSON.parse(all.KID_TASKS || 'null'), done: done };
+}
+
+function applyKidOp_(op) {
+  const clean = function (v, n) { return String(v || '').replace(/\s+/g, ' ').trim().slice(0, n); };
+  if (op.action === 'kidTasks') {
+    const tasks = (op.tasks || []).slice(0, 30).map(function (t) {
+      return {
+        id: clean(t.id, 24).replace(/[^\w-]/g, ''),
+        icon: clean(t.icon, 12),
+        label: clean(t.label, 40),
+        when: ['daily', 'school', 'home', 'date'].indexOf(t.when) === -1 ? 'daily' : t.when,
+        date: /^\d{4}-\d{2}-\d{2}$/.test(t.date || '') ? t.date : ''
+      };
+    }).filter(function (t) { return t.id && t.label; });
+    PROPS.setProperty('KID_TASKS', JSON.stringify(tasks));
+  } else if (op.action === 'kidDone') {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(op.date)) throw new Error('bad date');
+    const key = 'KID_DONE:' + op.date;
+    const ids = JSON.parse(PROPS.getProperty(key) || '[]').filter(function (id) { return id !== op.id; });
+    if (op.done) ids.push(clean(op.id, 24));
+    PROPS.setProperty(key, JSON.stringify(ids.slice(-40)));
+    const cutoff = Utilities.formatDate(new Date(Date.now() - 7 * 864e5), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+    PROPS.getKeys().forEach(function (k) { if (k.indexOf('KID_DONE:') === 0 && k.slice(9) < cutoff) PROPS.deleteProperty(k); });
+  } else {
+    throw new Error('unknown action');
+  }
 }
 
 function meals_() {

@@ -189,6 +189,21 @@ How a day is decided:
 - **School at home:** APS virtual-learning days.
 - **School day:** everything else. Early releases say *Short day*.
 
+**My jobs.** Big picture tiles Paul taps to check off ("Make bed. Done! Great job!"). When
+they're all done, there's a small celebration. Grown-ups set the jobs with **✏️ Grown-ups: edit
+jobs** at the bottom of his view (behind the Settings PIN). Each job has an emoji, a word or two,
+and when it applies: every day, school days, home days (these follow the 🏫/🏠 above), or one
+date. Ticks reset each day.
+
+**Coming up.** The next three big events, with a moon for each sleep left (a number when it's
+more than 10 away). These count: birthdays, APS breaks, big holidays from the US holidays
+calendar (Halloween, Thanksgiving, Christmas…), anything titled "No school …" or "Home day …",
+and anything with ⭐ in the title. **+ Add** has a *⭐ Count down to it* box for that.
+
+Jobs and ticks are stored in the first person's script, so every screen agrees. Countdowns look
+150 days ahead. Both need the latest `hub-script.gs`. Until it's updated, jobs are kept on the
+screen where they're set, and countdowns only see the next week.
+
 The button's name is in Settings (*Child's name*); leave it blank to hide the button.
 
 ### Dinner planning

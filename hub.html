@@ -267,6 +267,47 @@
   .kid-mini span { font-size: 46px; line-height: 1.2; }
   .kid-mini small { display: block; font-size: 15px; font-weight: 800; opacity: .85; }
   .kid-hint { font-size: 18px; font-weight: 700; opacity: .6; }
+  .kid-edit { border: 0; background: none; color: inherit; font: inherit; text-decoration: underline; cursor: pointer; }
+  .kid-grid { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 28px; width: min(1240px, 100%); align-items: start; }
+  .kid-col { display: flex; flex-direction: column; gap: 22px; align-items: center; min-width: 0; }
+  .kid-grid .kid-today { width: 100%; padding: 20px 20px 24px; }
+  .kid-grid .kid-icon { font-size: 150px; }
+  .kid-grid .kid-word { font-size: 52px; }
+  .kid-grid .kid-mini { width: 78px; padding: 10px 4px 12px; }
+  .kid-grid .kid-mini span { font-size: 38px; }
+  .kid-panel { width: 100%; background: rgba(255,255,255,.08); border-radius: 30px; padding: 16px 18px 18px; }
+  .kid-panel h3 { margin: 0 0 12px; font-size: 26px; font-weight: 900; }
+  .kid-jobs { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+  .kid-job {
+    border: 3px solid rgba(255,255,255,.2); background: rgba(255,255,255,.06); color: inherit; font: inherit; cursor: pointer;
+    border-radius: 24px; padding: 12px 8px 14px; display: grid; justify-items: center; gap: 4px; position: relative;
+  }
+  .kid-job .ji { font-size: 58px; line-height: 1.1; }
+  .kid-job .jl { font-size: 22px; font-weight: 900; line-height: 1.1; text-align: center; }
+  .kid-job .jc { position: absolute; top: 6px; right: 8px; font-size: 30px; }
+  .kid-job.done { background: rgba(86,227,159,.22); border-color: rgba(86,227,159,.8); }
+  .kid-job.done .ji, .kid-job.done .jl { opacity: .6; }
+  .kid-empty { font-size: 24px; font-weight: 800; opacity: .8; }
+  .kid-cd {
+    width: 100%; border: 0; background: rgba(255,255,255,.07); color: inherit; font: inherit; cursor: pointer; border-radius: 20px;
+    display: grid; grid-template-columns: 70px 1fr auto; align-items: center; gap: 10px; padding: 10px 14px; margin-top: 8px; text-align: left;
+  }
+  .kid-cd .ci { font-size: 50px; line-height: 1; }
+  .kid-cd .cn { font-size: 24px; font-weight: 900; line-height: 1.1; }
+  .kid-cd .cs { font-size: 20px; font-weight: 900; text-align: right; }
+  .kid-cd .cs i { display: block; font-style: normal; font-size: 18px; letter-spacing: -2px; }
+  .kid-cd .cs b { font-size: 36px; }
+  .kid-party { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+  .kid-party i { position: absolute; top: -60px; font-size: 44px; font-style: normal; animation: kidfall 2.6s ease-in forwards; }
+  @keyframes kidfall { to { transform: translateY(110vh) rotate(360deg); } }
+  .job-row { display: grid; grid-template-columns: 64px minmax(0, 1fr) 150px auto auto; gap: 8px; align-items: center; margin-bottom: 8px; }
+  .job-row input, .job-row select { border: 2px solid var(--line); border-radius: 10px; padding: 9px 10px; font-size: 16px; font-weight: 600; background: #fff; min-width: 0; }
+  .job-row .jr-icon { text-align: center; font-size: 22px; padding: 6px; }
+  @media (max-width: 900px) {
+    .kid-grid { grid-template-columns: 1fr; }
+    .job-row { grid-template-columns: 56px minmax(0, 1fr) auto; }
+    .job-row .jr-when, .job-row .jr-date { grid-column: 2; }
+  }
   @media (max-width: 640px) {
     .kid-icon { font-size: 130px; }
     .kid-word { font-size: 44px; }
@@ -491,7 +532,7 @@
     }
   }
   const inFlight = new Set();
-  async function refreshAll(parts = ['calendar', 'meals', 'list', 'plan']) {
+  async function refreshAll(parts = ['calendar', 'meals', 'list', 'plan', 'kid', 'upcoming']) {
     const tag = parts.join();
     if (inFlight.has(tag)) return;
     inFlight.add(tag);
@@ -520,6 +561,10 @@
       'demo-a': {
         calendar: [...shared, ev(0, 7, 45, 15, 'School drop-off'), ev(0, 10, 0, 60, 'Team standup'), ev(1, 18, 0, 90, 'Soccer practice', 'Lincoln Park field 3'), ev(2, 12, 0, 60, 'Lunch with Mike'), ev(3, 16, 30, 60, 'Oil change'), ev(5, 9, 0, 120, 'Soccer game'), ev(6, 10, 0, 90, 'Church')],
         list: [{ id: 'a', text: 'Milk', done: false }, { id: 'b', text: 'Bananas', done: false }, { id: 'c', text: 'Birthday candles', done: false }, { id: 'd', text: 'Coffee filters', done: true }],
+        upcoming: [
+          { id: 'u1', title: 'No school - Disney', allDay: true, start: dayKey(addDays(t, 9)), end: dayKey(addDays(t, 12)), calendar: 'Family', location: '' },
+          { id: 'u2', title: 'Halloween', allDay: true, start: dayKey(addDays(t, 35)), end: dayKey(addDays(t, 36)), calendar: 'Holidays in United States', location: '' },
+          { id: 'u3', title: 'Thanksgiving Break - Schools Closed', allDay: true, start: dayKey(addDays(t, 60)), end: dayKey(addDays(t, 63)), calendar: 'APS SY 2026-2027 Calendar', location: '' }],
         at: Date.now()
       },
       'demo-b': {
@@ -1110,24 +1155,200 @@
       synth.speak(u);
     } catch {}
   }
+  /* ── Paul's jobs: stored in the first person's script; on this screen only until it's updated ── */
+  const K_LOCAL_KID = 'hub.kid';
+  const DEFAULT_JOBS = [
+    { id: 'bed', icon: '🛏️', label: 'Make bed', when: 'daily', date: '' },
+    { id: 'backpack', icon: '🎒', label: 'Unpack backpack', when: 'school', date: '' },
+    { id: 'toys', icon: '🧸', label: 'Clean up toys', when: 'daily', date: '' },
+    { id: 'book', icon: '📚', label: 'Read a book', when: 'daily', date: '' }
+  ];
+  function currentKid() {
+    if (demoOn()) { view(); return demo.kid || (demo.kid = { tasks: DEFAULT_JOBS, done: {} }); }
+    const home = listHome(), remote = home && data[home.id]?.kid;
+    if (remote && remote.tasks) return remote;
+    const local = load(K_LOCAL_KID, null);
+    return { tasks: local?.tasks || remote?.tasks || DEFAULT_JOBS, done: local?.done || remote?.done || {} };
+  }
+  function applyKidOp(kid, op) {
+    const out = { tasks: kid.tasks, done: { ...kid.done } };
+    if (op.action === 'kidTasks') out.tasks = op.tasks;
+    if (op.action === 'kidDone') {
+      const ids = (out.done[op.date] || []).filter(id => id !== op.id);
+      if (op.done) ids.push(op.id);
+      out.done[op.date] = ids;
+    }
+    return out;
+  }
+  let kidLocalWarned = false;
+  async function kidOp(op) {
+    const next = applyKidOp(currentKid(), op);
+    if (demoOn()) { demo.kid = next; renderKid(); return; }
+    const home = listHome();
+    const saveLocal = () => save(K_LOCAL_KID, next);
+    if (!home) { saveLocal(); renderKid(); return; }
+    const d = data[home.id] || (data[home.id] = {});
+    if (d.kid?.tasks) d.kid = next; else saveLocal();
+    renderKid();
+    try {
+      const j = await postScript(home, op);
+      d.kid = j.kid; save(K_DATA, data); localStorage.removeItem(K_LOCAL_KID); renderKid();
+    } catch (e) {
+      saveLocal();
+      if (!kidLocalWarned) { kidLocalWarned = true; toast(e.message === 'unknown action' ? 'Saved on this screen only until the Google script is updated.' : `Couldn't save (${e.message}). Saved on this screen for now.`); }
+    }
+  }
+  function jobsFor(day) {
+    const kind = dayType(day).kind, key = dayKey(day);
+    return currentKid().tasks.filter(t => t.when === 'daily' || (t.when === 'school' && kind === 'school') ||
+      (t.when === 'home' && kind !== 'school') || (t.when === 'date' && t.date === key));
+  }
+
+  /* ── Countdowns to the next big events ── */
+  const HOLIDAYS = /halloween|thanksgiving|christmas day|new year'?s day|easter sunday|valentine|independence day/i;
+  function isMajor(e) {
+    const school = SCHOOL_CAL.test(e.calendar || '') || /^🏫/.test(e.title);
+    return /⭐|🎂|\bno school\b|\bhome day\b|vacation|\btrip\b/i.test(e.title) || HOLIDAYS.test(e.title) ||
+      (e.allDay && /birthday/i.test(e.title)) ||
+      (school && /\bbreak\b/i.test(e.title));
+  }
+  function majorName(e) {
+    let t = e.title.replace(/\p{Extended_Pictographic}\uFE0F?/gu, '').replace(/\s{2,}/g, ' ').trim();
+    const rest = t.match(/^(no school|home day)\b[\s:,–—-]*(.+)$/i);
+    t = rest ? rest[2] : t.split(/\s[-–—]\s/)[0];
+    return t.replace(/\s*\(.*?\)\s*$/, '').trim().slice(0, 28) || 'Big day';
+  }
+  function majorIcon(e) {
+    const own = e.title.replace(/[⭐🏫]/gu, '').match(/\p{Extended_Pictographic}/u);
+    if (own) return own[0];
+    const t = e.title.toLowerCase();
+    return [[/disney/, '🏰'], [/birthday/, '🎂'], [/halloween/, '🎃'], [/thanksgiving/, '🦃'], [/christmas|winter/, '🎄'], [/fall/, '🍂'],
+      [/spring|easter/, '🐣'], [/summer|independence/, '☀️'], [/valentine/, '❤️'], [/new year/, '🎆'], [/trip|vacation/, '🧳']]
+      .find(([re]) => re.test(t))?.[1] || '🎉';
+  }
+  function countdowns() {
+    const today = startOfDay(new Date()), seen = new Map();
+    const upcoming = connected().flatMap(m => data[m.id]?.upcoming || []).concat(demoOn() ? view()['demo-a'].upcoming || [] : []);
+    for (const e of [...mergedEvents(), ...upcoming]) {
+      if (!isMajor(e)) continue;
+      const start = e.allDay ? parseDay(e.start) : startOfDay(new Date(e.start));
+      const last = e.allDay ? addDays(parseDay(e.end), -1) : startOfDay(new Date(e.end));
+      if (last < today) continue;
+      const name = majorName(e), key = normMeal(name) || name;
+      const cur = seen.get(key);
+      if (!cur || start < cur.start) seen.set(key, { name, icon: majorIcon(e), start });
+    }
+    return [...seen.values()].sort((a, b) => a.start - b.start).slice(0, 3)
+      .map(c => ({ ...c, sleeps: Math.max(0, Math.round((c.start - today) / 864e5)) }));
+  }
+  const saySleeps = c => c.sleeps === 0 ? `${c.name} is today!` : `${c.sleeps} more sleep${c.sleeps === 1 ? '' : 's'} until ${c.name}!`;
+
   function renderKid() {
     const today = startOfDay(new Date()), t = dayType(today), k = KID[t.kind];
     const week = Array.from({ length: 7 }, (_, i) => addDays(today, i + 1));
+    const jobs = jobsFor(today), done = new Set(currentKid().done[dayKey(today)] || []);
+    const allDone = jobs.length > 0 && jobs.every(j => done.has(j.id));
+    const cds = countdowns();
     $('#kid-body').innerHTML = `
-      <button class="kid-today ${t.kind}" data-say="0">
-        <div class="kid-day">Today · ${today.toLocaleDateString([], { weekday: 'long' })}</div>
-        <div class="kid-icon" aria-hidden="true">${k.icon}</div>
-        <div class="kid-word">${k.word}</div>
-        ${t.why && t.why !== 'Weekend' ? `<div class="kid-why">${esc(t.why)}</div>` : ''}
-      </button>
-      <div class="kid-week">${week.map((d, i) => { const w = dayType(d); return `
-        <button class="kid-mini ${w.kind}" data-say="${i + 1}">
-          <b>${d.toLocaleDateString([], { weekday: 'short' })}</b>
-          <span aria-hidden="true">${KID[w.kind].icon}</span>
-          <small>${w.kind === 'school' ? 'School' : w.kind === 'virtual' ? 'Computer' : 'Home'}</small>
-        </button>`; }).join('')}</div>
-      <div class="kid-hint">Tap a picture to hear it</div>`;
+      <div class="kid-grid">
+        <div class="kid-col">
+          <button class="kid-today ${t.kind}" data-say="0">
+            <div class="kid-day">Today · ${today.toLocaleDateString([], { weekday: 'long' })}</div>
+            <div class="kid-icon" aria-hidden="true">${k.icon}</div>
+            <div class="kid-word">${k.word}</div>
+            ${t.why && t.why !== 'Weekend' ? `<div class="kid-why">${esc(t.why)}</div>` : ''}
+          </button>
+          <div class="kid-week">${week.map((d, i) => { const w = dayType(d); return `
+            <button class="kid-mini ${w.kind}" data-say="${i + 1}">
+              <b>${d.toLocaleDateString([], { weekday: 'short' })}</b>
+              <span aria-hidden="true">${KID[w.kind].icon}</span>
+              <small>${w.kind === 'school' ? 'School' : w.kind === 'virtual' ? 'Computer' : 'Home'}</small>
+            </button>`; }).join('')}</div>
+        </div>
+        <div class="kid-col">
+          <section class="kid-panel">
+            <h3>${allDone ? '🎉 All done!' : 'My jobs'}</h3>
+            ${jobs.length ? `<div class="kid-jobs">${jobs.map(j => `
+              <button class="kid-job${done.has(j.id) ? ' done' : ''}" data-job="${esc(j.id)}">
+                <span class="ji" aria-hidden="true">${esc(j.icon || '⭐')}</span>
+                <span class="jl">${esc(j.label)}</span>
+                <span class="jc" aria-hidden="true">${done.has(j.id) ? '✅' : ''}</span>
+              </button>`).join('')}</div>` : '<div class="kid-empty">No jobs today!</div>'}
+          </section>
+          ${cds.length ? `<section class="kid-panel">
+            <h3>Coming up</h3>
+            ${cds.map((c, i) => `
+              <button class="kid-cd" data-cd="${i}">
+                <span class="ci" aria-hidden="true">${esc(c.icon)}</span>
+                <span class="cn">${esc(c.name)}</span>
+                <span class="cs">${c.sleeps === 0 ? 'Today!' : c.sleeps <= 10 ? `<i aria-hidden="true">${'🌙'.repeat(c.sleeps)}</i>${c.sleeps} sleep${c.sleeps === 1 ? '' : 's'}` : `<b>${c.sleeps}</b> sleeps`}</span>
+              </button>`).join('')}
+          </section>` : ''}
+        </div>
+      </div>
+      <div class="kid-hint">Tap a picture to hear it · <button class="kid-edit" data-act="kid-jobs">✏️ Grown-ups: edit jobs</button></div>`;
   }
+  function toggleJob(id) {
+    const today = startOfDay(new Date()), key = dayKey(today);
+    const job = currentKid().tasks.find(t => t.id === id);
+    if (!job) return;
+    const wasDone = (currentKid().done[key] || []).includes(id);
+    kidOp({ action: 'kidDone', date: key, id, done: !wasDone });
+    if (wasDone) return;
+    const jobs = jobsFor(today), done = new Set(currentKid().done[key] || []);
+    if (jobs.every(j => done.has(j.id))) { speakKid(`${job.label}. Done! You finished all your jobs! Amazing!`); celebrate(); }
+    else speakKid(`${job.label}. Done! Great job!`);
+  }
+  function celebrate() {
+    const layer = document.createElement('div');
+    layer.className = 'kid-party';
+    layer.innerHTML = Array.from({ length: 28 }, () => `<i style="left:${Math.random() * 100}%;animation-delay:${(Math.random() * 1.2).toFixed(2)}s">${['🎉', '⭐', '🎈', '✨', '🏆'][Math.floor(Math.random() * 5)]}</i>`).join('');
+    $('#kid').appendChild(layer);
+    setTimeout(() => layer.remove(), 3500);
+  }
+  function openKidJobs() {
+    const rows = currentKid().tasks.map(t => ({ ...t }));
+    const row = (t, i) => `
+      <div class="job-row" data-i="${i}">
+        <input class="jr-icon" value="${esc(t.icon)}" maxlength="12" aria-label="Picture" placeholder="⭐">
+        <input class="jr-label" value="${esc(t.label)}" maxlength="40" placeholder="Job name" aria-label="Job name">
+        <select class="jr-when" aria-label="When">
+          ${[['daily', 'Every day'], ['school', 'School days'], ['home', 'Home days'], ['date', 'One day…']].map(([v, l]) => `<option value="${v}"${t.when === v ? ' selected' : ''}>${l}</option>`).join('')}
+        </select>
+        <input class="jr-date" type="date" value="${esc(t.date || '')}"${t.when === 'date' ? '' : ' hidden'} aria-label="Date">
+        <button type="button" class="link-btn" data-jobdel="${i}" aria-label="Remove">✕</button>
+      </div>`;
+    const draw = () => {
+      openSheet(`
+        <h2>${esc(cfg.kidName || 'Kid')}'s jobs</h2>
+        <div class="hint">One picture (an emoji) and a word or two each. School days and home days follow the 🏫/🏠 on ${esc(cfg.kidName || 'the kid')}'s view.</div>
+        <div id="job-rows" style="margin-top:14px">${rows.map(row).join('')}</div>
+        <button type="button" class="btn ghost" data-jobadd="1" style="margin-top:10px">+ Add a job</button>
+        <div class="actions">
+          <button type="button" class="btn ghost" data-act="close">Cancel</button>
+          <button type="button" class="btn" data-jobsave="1">Save</button>
+        </div>`, true);
+    };
+    const read = () => $$('#job-rows .job-row').forEach(el => {
+      const r = rows[+el.dataset.i];
+      r.icon = $('.jr-icon', el).value.trim(); r.label = $('.jr-label', el).value.trim();
+      r.when = $('.jr-when', el).value; r.date = $('.jr-date', el).value;
+    });
+    draw();
+    $('#sheet').onclick = e => {
+      if (e.target.closest('[data-jobadd]')) { read(); rows.push({ id: uid(), icon: '', label: '', when: 'daily', date: '' }); draw(); $$('.jr-label').at(-1)?.focus(); }
+      const del = e.target.closest('[data-jobdel]');
+      if (del) { read(); rows.splice(+del.dataset.jobdel, 1); draw(); }
+      if (e.target.closest('[data-jobsave]')) {
+        read();
+        kidOp({ action: 'kidTasks', tasks: rows.filter(r => r.label).map(r => ({ ...r, id: r.id || uid(), date: r.when === 'date' ? r.date : '' })) });
+        $('#sheet').onclick = null;
+        closeSheet();
+      }
+    };
+    $('#sheet').onchange = e => { const sel = e.target.closest('.jr-when'); if (sel) sel.parentElement.querySelector('.jr-date').hidden = sel.value !== 'date'; };
+  }
+
   let kidOpenedAt = 0;
   function openKid() {
     kidOpenedAt = Date.now();
@@ -1222,6 +1443,7 @@
         <div class="hint" style="margin-top:-6px">Leave the times empty for an all-day event.</div>
         <label class="field">Where (optional)<input id="ae-loc" maxlength="200" autocomplete="off"></label>
         ${ms.length > 1 ? `<label class="field">Whose calendar<select id="ae-who">${ms.map((m, i) => `<option value="${i}">${esc(m.name)}</option>`).join('')}</select></label>` : ''}
+        <label class="check"><input type="checkbox" id="ae-star"> ⭐ Count down to it on ${esc(cfg.kidName || 'the kid')}'s view</label>
         <label class="check" id="ae-invite-row"${others(ms[0]).length ? '' : ' hidden'}><input type="checkbox" id="ae-invite" checked> Invite everyone else, so it's on their calendar too</label>
         <label class="check" id="ae-work-row" hidden><input type="checkbox" id="ae-work" checked> <span>During work hours: make it private and add <span id="ae-work-to"></span> as optional</span></label>
         <div class="actions" style="margin-top:4px">
@@ -1244,7 +1466,7 @@
       const who = ms[+($('#ae-who')?.value || 0)];
       const ev = {
         action: 'addEvent',
-        title: $('#ae-title').value.trim(),
+        title: ($('#ae-star').checked && !/⭐/.test($('#ae-title').value) ? '⭐ ' : '') + $('#ae-title').value.trim(),
         date: $('#ae-date').value,
         start: $('#ae-start').value,
         end: $('#ae-end').value,
@@ -1416,7 +1638,7 @@
 
   /* ── Sheets: settings, event details ── */
   function openSheet(html, wide = false) { $('#sheet').innerHTML = html; $('#sheet').classList.toggle('wide', wide); $('#modal').hidden = false; }
-  function closeSheet() { $('#modal').hidden = true; $('#sheet').innerHTML = ''; }
+  function closeSheet() { $('#modal').hidden = true; $('#sheet').innerHTML = ''; $('#sheet').onclick = null; $('#sheet').onchange = null; }
 
   let draft = null;
   /* ── Settings PIN: the settings hold the keys to both Google scripts ── */
@@ -1428,11 +1650,11 @@
   const randomHex = n => [...crypto.getRandomValues(new Uint8Array(n))].map(b => b.toString(16).padStart(2, '0')).join('');
 
   function openSettings() {
-    if (cfg.pinHash && Date.now() > unlockedUntil) { askPin(); return; }
+    if (cfg.pinHash && Date.now() > unlockedUntil) { askPin(openSettings); return; }
     draft = JSON.parse(JSON.stringify(cfg));
     renderSettings();
   }
-  function askPin() {
+  function askPin(then) {
     openSheet(`
       <h2>Enter PIN</h2>
       <div class="hint">Settings are locked because they hold the keys to your Google scripts.</div>
@@ -1452,7 +1674,7 @@
       if (await sha256(cfg.pinSalt + ':' + $('#pin-in').value) === cfg.pinHash) {
         pinFails = 0;
         unlockedUntil = Date.now() + 5 * 60 * 1000;
-        openSettings();
+        then();
         return;
       }
       pinFails++;
@@ -1601,6 +1823,10 @@
   document.addEventListener('click', async e => {
     const t = e.target;
     if (t.id === 'modal') { closeSheet(); return; }
+    const job = t.closest('[data-job]');
+    if (job) { toggleJob(job.dataset.job); return; }
+    const cd = t.closest('[data-cd]');
+    if (cd) { const c = countdowns()[+cd.dataset.cd]; if (c) speakKid(saySleeps(c)); return; }
     const say = t.closest('[data-say]');
     if (say) { const i = +say.dataset.say; speakKid(sayDay(addDays(startOfDay(new Date()), i), ['Today', 'Tomorrow'][i])); return; }
     const wk = t.closest('[data-week]');
@@ -1634,6 +1860,7 @@
     if (act === 'close') closeSheet();
     if (act === 'kid') openKid();
     if (act === 'kid-close') closeKid();
+    if (act === 'kid-jobs') { if (cfg.pinHash && Date.now() > unlockedUntil) askPin(openKidJobs); else openKidJobs(); }
     if (act === 'paste-setup') openPasteSetup();
     if (act === 'planner') openPlanner();
     if (act === 'import') openImport();
