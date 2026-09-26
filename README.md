@@ -174,25 +174,33 @@ script creates the folder when you run **setup**.
 and the behavior log by name. Either remove the names, or make the repository private.
 GitHub Pages for a private repository needs a paid GitHub plan.
 
-### Meal planning
+### Dinner planning
 
-Tap **Plan meals** on the meals card. The planner shows a week (**This week** / **Next
-week**) with breakfast, lunch and dinner for each day. Type a meal, or start typing and pick a
-favorite. Each box saves as soon as you leave it, and the plan shows on every screen that uses
-the same script: today's meals on the card, and each day's dinner in the calendar columns.
-Phones can plan too: open the hub link and add it to the home screen.
+Tap **Plan dinners** on the dinner card. The planner shows a week of dinners, **Friday to
+Thursday** by default (change it in Settings → *Dinner weeks start on*), with **Next week** and
+**Week after**. Type a dinner, or start typing and pick a favorite. Each box saves as soon as you
+leave it and shows on every screen: tonight's dinner and the rest of the week on the card, and
+each day's dinner in the calendar columns. Phones can plan too: open the hub link and add it to
+the home screen.
 
-**Favorites** are meals saved with a shopping list, like *Tacos → ground beef, taco shells,
-cheese…*. Save one from the ＋ chips under the planner (it suggests this week's dinners) or with
-**＋ New favorite**. Then 🛒 on a day, or **Add this week's groceries**, puts those ingredients
-on the family list, skipping anything already on it.
+**Favorites** hold a dinner's recipe link, who can cook it, and its shopping list. Tap one to
+edit it, or use the ＋ chips (this week's dinners that aren't favorites yet) or **＋ New
+favorite**. When a planned dinner matches a favorite, 🔗 opens the recipe and 👨‍🍳 shows who can
+cook it. Matching ignores capitals, emoji and a one-letter typo, so "Ghoulash 👻" finds "Goulash".
+🛒 on a day, or **Add the week's groceries**, puts favorites' ingredients on the family list,
+skipping anything already there.
 
-The plan lives in the first person's script, like the family list, and keeps two weeks of
-history. Update the script to the latest `hub-script.gs` (and publish a new version) to use it.
+**Moving over from the Notes app:** in the planner, tap **Import from the Notes app** and paste
+the whole meals note. Dated weeks (a line like `9/25`, then `Friday- Chicken pot pie soup`) fill
+the planner. A recipe name followed by its link (on the same line or the next) becomes a
+favorite with that link, and names under a line like `Meals Scott can cook` are tagged with that
+cook. Links with no name nearby are counted and skipped, since there's no telling what dish
+they are. It shows what it found before saving anything. Importing twice is safe: favorites merge
+and existing ingredients are kept.
 
-The Apple Note still works as a fallback for any day the planner leaves empty, so you can
-switch over gradually. Typing into a day that came from the note moves the whole day into the
-planner. Once you've switched, delete the Shortcut automation.
+The plan and favorites live in the first person's script, like the family list, with two weeks
+of history. To use them, update the script to the latest `hub-script.gs` and publish a new
+version. Until the note is imported, the hub still reads it for any day the planner leaves empty.
 
 ### 2. The meals note (optional, older way) (your wife's iPhone, ~3 minutes)
 

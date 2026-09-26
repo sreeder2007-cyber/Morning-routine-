@@ -288,16 +288,51 @@ function applyPlanOp_(op) {
     const cutoff = Utilities.formatDate(new Date(Date.now() - PLAN_KEEP_DAYS * 864e5), Session.getScriptTimeZone(), 'yyyy-MM-dd');
     PROPS.getKeys().forEach(function (k) { if (k.indexOf('PLAN:') === 0 && k.slice(5) < cutoff) PROPS.deleteProperty(k); });
   } else if (op.action === 'favSave') {
-    const name = clean(op.name, 60);
-    if (!name) throw new Error('bad favorite');
-    const items = (op.items || []).map(function (i) { return clean(i, 80); }).filter(Boolean).slice(0, 40);
-    if (op.oldName && op.oldName.toLowerCase() !== name.toLowerCase()) PROPS.deleteProperty('FAV:' + clean(op.oldName, 60).toLowerCase());
-    PROPS.setProperty('FAV:' + name.toLowerCase(), JSON.stringify({ name: name, items: items }));
+    const fav = cleanFav_(op);
+    if (!fav) throw new Error('bad favorite');
+    if (op.oldName && op.oldName.toLowerCase() !== fav.name.toLowerCase()) PROPS.deleteProperty('FAV:' + clean(op.oldName, 60).toLowerCase());
+    PROPS.setProperty('FAV:' + fav.name.toLowerCase(), JSON.stringify(fav));
+  } else if (op.action === 'planImport') {
+    // One request for a whole pasted note: dinners by date, plus favorites merged into any
+    // that already exist (existing ingredients kept; a missing link or cook filled in).
+    const days = op.days || {};
+    Object.keys(days).slice(0, 60).forEach(function (date) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !clean(days[date], 120)) return;
+      const key = 'PLAN:' + date;
+      const day = JSON.parse(PROPS.getProperty(key) || '{}');
+      PROPS.setProperty(key, JSON.stringify({ b: day.b || '', l: day.l || '', d: clean(days[date], 120) }));
+    });
+    (op.favs || []).slice(0, 150).forEach(function (f) {
+      const fav = cleanFav_(f);
+      if (!fav) return;
+      const key = 'FAV:' + fav.name.toLowerCase();
+      const old = JSON.parse(PROPS.getProperty(key) || 'null');
+      if (old) {
+        fav.name = old.name;
+        fav.items = old.items && old.items.length ? old.items : fav.items;
+        fav.link = old.link || fav.link;
+        fav.cooks = (old.cooks || []).concat(fav.cooks.filter(function (c) { return (old.cooks || []).indexOf(c) === -1; }));
+      }
+      PROPS.setProperty(key, JSON.stringify(fav));
+    });
   } else if (op.action === 'favDelete') {
     PROPS.deleteProperty('FAV:' + clean(op.name, 60).toLowerCase());
   } else {
     throw new Error('unknown action');
   }
+}
+
+function cleanFav_(f) {
+  const clean = function (v, n) { return String(v || '').replace(/\s+/g, ' ').trim().slice(0, n); };
+  const name = clean(f && f.name, 60);
+  if (!name) return null;
+  const link = clean(f.link, 500);
+  return {
+    name: name,
+    link: /^https?:\/\/\S+$/.test(link) ? link : '',
+    cooks: (f.cooks || []).map(function (c) { return clean(c, 40); }).filter(Boolean).slice(0, 6),
+    items: (f.items || []).map(function (i) { return clean(i, 80); }).filter(Boolean).slice(0, 40)
+  };
 }
 
 function inboxFolder_() {
