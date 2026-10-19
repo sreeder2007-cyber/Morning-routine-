@@ -331,31 +331,40 @@ and adding or removing a child are in **⚙️ → Children**.
 **Plans, not a pile of magnets.** The Activities part starts from the day's plan, which is put
 together from three places:
 - **School or home day**, with the same rules as Paul's view (weekends, breaks and closures on
-  the APS calendar, anything titled "No school" or "Home day").
-- **The weekly routine** in ⚙️: tap the days for ABA, Gym, Library and the rest, with "School
-  days only" for things like gym class that skip breaks and holidays. The first routine is an
-  example to change.
+  the APS calendar, anything titled "No school" or "Home day", 💻 *School at home* on virtual
+  days). Without a school calendar, the big federal holidays count as home days.
 - **Calendar events with the child's name in the title**, like `Paul – dentist`, `Ellie library`
-  or `Paul ABA`. "Kids" counts for everyone. It knows ABA, gym/PE, library, doctor, dentist,
-  birthday, party, play date, piano/music, soccer/swim/practice, park and vacation.
+  or `Paul OT`. "Kids" or "family" counts for everyone; "no kids" or "adults only" counts for
+  no one. It knows ABA/BCBA, OT, speech and other therapy, doctor, dentist, check-ups and
+  shots, gym/PE, library, birthday, party, play date, field trip, recital, picture day,
+  piano/music, soccer/swim/practice, park and vacation. `Paul – no ABA today` takes ABA off.
+- **The weekly routine** in ⚙️ → *Weekly routine* (pick the child at the top): tap the days for
+  ABA, Gym, Library and the rest, with "School days only" for things like gym class that skip
+  breaks, holidays and school-at-home days. It comes with example days that are only used in
+  the sample until you tap **Use these** or set your own.
 
-The planned magnets show as outlines on the board and come first in the tray ("Let's put
-today's plan on the board!"), so the job is matching, not guessing. Up to four fit.
+The child's own events come first, then the routine, up to four. The planned magnets show as
+outlines on the board and first in the tray ("Let's put today's plan on the board!"), so the
+job is matching, not guessing. Extras can still be added.
 
 **Weather.** With a ZIP code in the hub's Settings, the temperature and weather questions add
 "The weather report says it will be cool today." The child still picks: it's an observation,
 not a test.
 
 **Tomorrow.** 🌙 **Tomorrow** (and *What about tomorrow?* after Read it back) shows the next day:
-the day, the weather with what to wear, and the plan, read aloud. Good for bedtime.
+the day, a holiday that starts tomorrow, the weather with what to wear (with the hub's
+chilly-morning jacket), and the plan, read aloud. Good for bedtime. A sample forecast is shown
+but never read aloud.
 
-**The voice** is recorded ahead of time (`voice/`, about 4 MB) so it sounds the same and natural
-on every device; the device's own voice fills in only if a file can't load. ⚙️ has Voice
+**The voice** is recorded ahead of time (`voice/`, about 5 MB) so it sounds the same and natural
+on every device; the device's own voice fills in only if a file can't load or takes more than
+a second and a half. ⚙️ has Voice
 (natural / device / off), Sounds, **Pretend it's tomorrow** to preview a normal morning,
 **See it finished**, and an empty board.
 
 Everything is stored on the device: each child's board and the routines. It reads the hub's
-calendar and forecast from the same browser, so use it on the device where the hub is set up
+calendar and forecast from the same browser (and checks again every few minutes while it's
+open), so use it on the device where the hub is set up
 (the tablet, or Chrome on a phone with the hub's setup link). An iPhone Home Screen app keeps
 its own storage, so there it shows a sample forecast and uses only the routine. To change what
 the voice says, see `tools/voice/README.md`.

@@ -381,12 +381,12 @@ button:focus-visible, [role="button"]:focus-visible { outline: 3px solid var(--y
 .kids {
   position: absolute; z-index: 9; top: 10px;
   left: max(16px, env(safe-area-inset-left, 0px)); right: max(16px, env(safe-area-inset-right, 0px));
-  display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; pointer-events: none;
+  display: flex; justify-content: safe center; gap: 10px; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; pointer-events: none;
   transition: opacity .3s, transform .3s;
 }
 .kids:empty { display: none; }
 .kid-tab {
-  pointer-events: auto;
+  pointer-events: auto; flex: none;
   --kc: var(--blue);
   display: inline-flex; align-items: center; gap: 8px;
   font: 700 18px/1 var(--display); color: var(--star);
@@ -417,6 +417,8 @@ button:focus-visible, [role="button"]:focus-visible { outline: 3px solid var(--y
 .kid-row select { font-size: 20px; padding: 6px; border-radius: 10px; border: 1.5px solid #d9d3c4; background: #fff; }
 .chk { display: inline-flex; align-items: center; gap: 6px; font: 700 14px/1.2 var(--ui); color: var(--ink-soft); }
 .routine { display: grid; gap: 4px; }
+.kid-confirm { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 12px; margin: 6px 0; border-radius: 12px; background: #fdecea; font: 700 15px/1.3 var(--ui); color: #8a1f12; }
+.btn.danger { background: #d9362b; color: #fff; box-shadow: 0 3px 0 #8f2416; }
 .rt-row { display: grid; grid-template-columns: minmax(0, 9em) auto; align-items: center; gap: 4px 10px; padding: 6px 0; border-bottom: 1px solid #ece6d8; }
 .rt-name { font: 700 15px/1.2 var(--ui); color: var(--ink); }
 .rt-days { display: inline-flex; gap: 4px; flex-wrap: wrap; }
@@ -726,7 +728,9 @@ canvas.confetti { position: absolute; inset: 0; width: 100%; height: 100%; point
   const ACTIVITIES = [
     { id: 'school', name: 'School', em: '🏫', c: '#2b62c8' },
     { id: 'home', name: 'Home day', em: '🏠', c: '#7a52c7' },
+    { id: 'virtual', name: 'School at home', em: '💻', c: '#1f7fb8' },
     { id: 'aba', name: 'ABA', say: 'A-B-A', em: '🧑‍🏫', c: '#0f8b8d' },
+    { id: 'therapy', name: 'Therapy', em: '🗣️', c: '#8a5cc7' },
     { id: 'gym', name: 'Gym', em: '🤸', c: '#e2672f' },
     { id: 'park', name: 'Park', em: '🛝', c: '#3a9d4a' },
     { id: 'playdate', name: 'Play date', em: '🧸', c: '#d9822b' },
@@ -842,6 +846,7 @@ canvas.confetti { position: absolute; inset: 0; width: 100%; height: 100%; point
     });
     add('tmr.plans', 'Tomorrow’s plans:');
     add('tmr.nothing', 'Nothing special tomorrow.');
+    add('tmr.chilly', 'It will be chilly in the morning, so bring a jacket.');
     add('ask.plan', 'Let’s put today’s plan on the board!');
     add('gen.planall', 'That’s the whole plan. Great job!');
     add('gen.tomorrow', 'Let’s look at tomorrow!');
@@ -1026,12 +1031,16 @@ canvas.confetti { position: absolute; inset: 0; width: 100%; height: 100%; point
   }
   /* School day or home day: the same rules as Paul's view on the hub */
   const SCHOOL_CAL = /\baps\b|school/i;
+  const fromSchool = e => SCHOOL_CAL.test(e.calendar || '') || /^🏫/.test(e.title);
+  const hasSchoolCal = () => hubMembers().some(m => ((HUB.data[m.id] || {}).calendar || []).some(e => e && typeof e.title === 'string' && fromSchool(e)));
+  const SCHOOL_HOLIDAYS = ['newyear', 'mlk', 'memorial', 'july4', 'labor', 'thanks', 'christmas'];
   function dayKind(day) {
     const evs = hubEventsOn(keyOf(day));
-    const fromSchool = e => SCHOOL_CAL.test(e.calendar || '') || /^🏫/.test(e.title);
     if (evs.some(e => /\bno school\b|\bhome day\b|\bschools? (are )?closed\b/i.test(e.title) || (fromSchool(e) && /\b(break|holiday|closed)\b/i.test(e.title)))) return 'home';
     if (evs.some(e => fromSchool(e) && /\bvirtual\b/i.test(e.title))) return 'virtual';
-    return day.getDay() === 0 || day.getDay() === 6 ? 'home' : 'school';
+    if (day.getDay() === 0 || day.getDay() === 6) return 'home';
+    if (!hasSchoolCal() && todayInfo(day).todaysAll.some(h => SCHOOL_HOLIDAYS.includes(h.key))) return 'home';
+    return 'school';
   }
 
   /* Forecast for a day (0 = today), from the hub's weather or the sample */
@@ -1049,8 +1058,9 @@ canvas.confetti { position: absolute; inset: 0; width: 100%; height: 100%; point
     const d = src && Array.isArray(src.days) && src.days.find(x => x.t === key);
     if (!d) return null;
     const temp = tempId(d.hi), weather = wxId(d.c);
-    const wear = WEAR[temp] + (weather === 'rainy' || weather === 'stormy' ? '☔' : '') + (weather === 'snowy' ? '🥾' : '');
-    return { hi: d.hi, lo: d.lo, temp, weather, wear, sample };
+    const chilly = d.lo < 50 && d.hi > 49;
+    const wear = WEAR[temp] + (chilly && !WEAR[temp].includes('🧥') ? '🧥' : '') + (weather === 'rainy' || weather === 'stormy' ? '☔' : '') + (weather === 'snowy' ? '🥾' : '');
+    return { hi: d.hi, lo: d.lo, temp, weather, wear, chilly, sample };
   }
 
   /* ── Children: each has a name tab, a board and a weekly routine ── */
@@ -1058,7 +1068,7 @@ canvas.confetti { position: absolute; inset: 0; width: 100%; height: 100%; point
   const boardKey = id => 'my-daily-calendar:board:' + id;
   const AVATARS = ['🚀', '🦋', '🦖', '🌈', '🐶', '🐱', '⚽', '🦄', '🐢', '🌟'];
   const KID_COLORS = ['#2f72d6', '#d6457f', '#36a04c', '#7a52c7'];
-  const ROUTINE_ACTS = () => ACTIVITIES.filter(a => a.id !== 'school' && a.id !== 'home');
+  const ROUTINE_ACTS = () => ACTIVITIES.filter(a => !['school', 'home', 'virtual'].includes(a.id));
   function defaultKids() {
     const first = HUB.cfg && typeof HUB.cfg.kidName === 'string' && HUB.cfg.kidName.trim() ? HUB.cfg.kidName.trim() : 'Paul';
     return [
@@ -1072,7 +1082,8 @@ canvas.confetti { position: absolute; inset: 0; width: 100%; height: 100%; point
     const out = [];
     raw.slice(0, 4).forEach((k, i) => {
       if (!k || typeof k !== 'object') return;
-      const id = typeof k.id === 'string' && /^[\w-]{1,24}$/.test(k.id) && !out.some(x => x.id === k.id) ? k.id : 'k' + (i + 1) + Math.random().toString(36).slice(2, 6);
+      let id = typeof k.id === 'string' && /^[\w-]{1,24}$/.test(k.id) ? k.id : 'k' + (i + 1);
+      for (let n = 2; out.some(x => x.id === id); n++) id = 'k' + (i + 1) + '-' + n;   /* stable, so the board is found again */
       const routine = {};
       if (k.routine && typeof k.routine === 'object') for (const a of ROUTINE_ACTS()) {
         const r = k.routine[a.id];
@@ -1089,32 +1100,41 @@ canvas.confetti { position: absolute; inset: 0; width: 100%; height: 100%; point
   /* Today's plan: school or home day, the weekly routine, and calendar events that name the child */
   const EVENT_ACTS = [
     ['aba', /\baba\b|\bbcba\b|\brbt\b|behavior therapy/i],
-    ['gym', /\bgym\b|\bp\.e\.?(?=\s|$)|\bpe\b(?= class| day|$)|physical education/i],
+    ['therapy', /\b(ot|pt|slp)\b|occupational|physical therapy|speech|therap(y|ist)/i],
+    ['doctor', /doctor|dentist|pediatric|check-?up|well[- ]?(visit|check)|\bshots?\b|vaccin|\bdr\.?\s/i],
+    ['gym', /\bgym\b|physical education/i],
+    ['gym', /\bP\.?E\b/],
     ['library', /librar/i],
-    ['doctor', /doctor|dentist|pediatric|check-?up|\bdr\.?\s/i],
     ['birthday', /birthday|🎂/i],
     ['party', /\bparty\b/i],
     ['playdate', /play ?date/i],
+    ['special', /field trip|field day|recital|picture day|show and tell|performance/i],
     ['music', /\bmusic\b|piano|guitar|violin|drums?\b|choir|singing/i],
     ['sports', /soccer|baseball|t-?ball|basketball|football|swim|gymnastics|karate|dance|hockey|tennis|practice/i],
     ['park', /\bpark\b|playground/i],
     ['vacation', /vacation|disney|\btrip\b|beach/i]
   ];
   const nameRe = name => new RegExp(`(^|[^\\p{L}])${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:['’]s)?(?=$|[^\\p{L}])`, 'iu');
+  const NOT = /\b(no|not|cancel+ed|canceled|closed|skip(ped)?)\b/i;
+  const NO_KIDS = /\b(no|without)\s+(kids|children)\b|kids?[- ]free|adults? only/i;
   function planFor(add, k) {
-    const day = shifted(add), out = [];
-    const push = (id, why) => { if (out.length < 4 && ACTIVITIES.some(a => a.id === id) && !out.some(x => x.id === id)) out.push({ id, why }); };
+    const day = shifted(add), out = [], drop = new Set(), hits = [];
+    const push = (id, why) => { if (out.length < MAX_ACTS && !drop.has(id) && ACTIVITIES.some(a => a.id === id) && !out.some(x => x.id === id)) out.push({ id, why }); };
     const kind = dayKind(day);
-    if (k.school) push(kind === 'home' ? 'home' : 'school', kind === 'home' ? 'Home day' : kind === 'virtual' ? 'School at home' : 'School day');
-    for (const a of ROUTINE_ACTS()) {
-      const r = k.routine[a.id];
-      if (r && r.days.includes(day.getDay()) && !(r.schoolOnly && kind === 'home')) push(a.id, 'Weekly routine');
-    }
-    const me = nameRe(k.name), everyone = /\b(kids|children|both kids|everyone)\b/i;
-    for (const ev of hubEventsOn(keyOf(day))) {
-      if (!me.test(ev.title) && !everyone.test(ev.title)) continue;
+    const me = nameRe(k.name), everyone = /\b(kids|children|everyone|family)\b/i;
+    const evs = hubEventsOn(keyOf(day)).filter(ev => !NO_KIDS.test(ev.title));
+    for (const ev of [...evs.filter(ev => me.test(ev.title)), ...evs.filter(ev => !me.test(ev.title) && everyone.test(ev.title))]) {
       const hit = EVENT_ACTS.find(([, re]) => re.test(ev.title));
-      if (hit) push(hit[0], ev.title);
+      if (!hit) continue;
+      /* "Paul – no ABA today" takes ABA off the plan, routine included */
+      if (NOT.test(ev.title.replace(/\bno school\b/ig, ''))) drop.add(hit[0]); else hits.push([hit[0], ev.title]);
+    }
+    if (k.school) push(kind === 'home' ? 'home' : kind === 'virtual' ? 'virtual' : 'school', kind === 'home' ? 'Home day' : kind === 'virtual' ? 'School at home' : 'School day');
+    hits.forEach(([id, why]) => push(id, why));
+    /* example routines only show in the sample; at home they wait until a grown-up sets them */
+    if (!k.example || sampleMode()) for (const a of ROUTINE_ACTS()) {
+      const r = k.routine[a.id];
+      if (r && r.days.includes(day.getDay()) && !(r.schoolOnly && kind !== 'school')) push(a.id, 'Weekly routine');
     }
     return out;
   }
@@ -1140,13 +1160,17 @@ canvas.confetti { position: absolute; inset: 0; width: 100%; height: 100%; point
   }
   function load() {
     try { const p = JSON.parse(localStorage.getItem(PREFS)); if (p) prefs = { ...prefs, ...p }; } catch (e) {}
-    kids = cleanKids(readLS(KIDS_KEY)) || defaultKids();
+    const stored = readLS(KIDS_KEY);
+    kids = cleanKids(stored) || defaultKids();
+    if (JSON.stringify(stored) !== JSON.stringify(kids)) saveKids();
+    /* the board from before there were tabs belongs to the first child */
+    const old = readLS(OLD_KEY);
+    if (old) { if (!readLS(boardKey(kids[0].id))) writeLS(boardKey(kids[0].id), old); try { localStorage.removeItem(OLD_KEY); } catch (e) {} }
     kid = kids.find(k => k.id === prefs.kid) || kids[0];
     state = loadBoard(kid.id);
   }
   function loadBoard(id) {
-    let s = readLS(boardKey(id));
-    if (!s && id === kids[0].id) s = readLS(OLD_KEY);   /* the board from before there were tabs */
+    const s = readLS(boardKey(id));
     return s && typeof s === 'object' && s.board ? clean(s) : sampleState();
   }
   const saveKids = () => writeLS(KIDS_KEY, kids);
@@ -1181,7 +1205,7 @@ canvas.confetti { position: absolute; inset: 0; width: 100%; height: 100%; point
     return set;
   }
   const sleepsTo = h => h.start - T.n;
-  const holKey = v => String(v).replace(/\d+$/, '');
+  const holKey = v => String(v).replace(/\d{4}$/, '');
   const dayOptions = () => DAYS.map((n, i) => ({ v: i, html: tile(n, 't-day'), label: n }));
 
   const SLOTS = {
@@ -1497,9 +1521,10 @@ canvas.confetti { position: absolute; inset: 0; width: 100%; height: 100%; point
     coach.inert = modal || run.mode === 'zoom';
     back.inert = tray.inert = modal || run.mode !== 'zoom';
   }
-  let lastFocus = null;
+  let lastFocus = null, lastAct = null;
   function openOverlay(el) {
     lastFocus = document.activeElement;
+    lastAct = lastFocus && lastFocus.dataset ? lastFocus.dataset.act || null : null;
     el.hidden = false;
     applyInert();
     const c = el.querySelector('.card-head .round');
@@ -1518,7 +1543,9 @@ canvas.confetti { position: absolute; inset: 0; width: 100%; height: 100%; point
     prefs.kid = id; savePrefs();
     state = loadBoard(id);
     run.misses = {}; run.wrong = {}; run.prompted = false;
+    const tabFocused = kidsBar.contains(document.activeElement);
     renderTabs();
+    if (tabFocused) { const t = kidsBar.querySelector('[aria-pressed="true"]'); if (t) t.focus({ preventScroll: true }); }
     zoomOut({ announce: false }).then(() => sayIds([coachMsgId()]));
   }
 
@@ -1597,7 +1624,7 @@ canvas.confetti { position: absolute; inset: 0; width: 100%; height: 100%; point
         }).join('')}
       </div>
       <div class="foot">${S.kind === 'multi'
-        ? (todays.length ? '<button class="btn" type="button" data-act="acts-done">That’s all</button>' : '<button class="btn quiet" type="button" data-act="acts-none">Nothing special today</button>')
+        ? (todays.length ? '<button class="btn" type="button" data-act="acts-done">That’s all</button>' : todayPlan().length ? '' : '<button class="btn quiet" type="button" data-act="acts-none">Nothing special today</button>')
         : ''}</div>`;
     if (keep !== null) {
       const t = [...surface.querySelectorAll('[data-v], [data-act]')].find(x => (x.dataset.v ?? x.dataset.act) === keep);
@@ -1635,17 +1662,21 @@ canvas.confetti { position: absolute; inset: 0; width: 100%; height: 100%; point
   }
   function overviewCam() {
     const S = stageBox();
-    const tabs = kidsBar.offsetHeight ? kidsBar.offsetHeight + 10 : 0;
-    S.y0 += tabs; S.ih -= tabs;
     const W = board.offsetWidth, H = board.offsetHeight, gap = 14;
     const dock = S.iw / S.ih > 1.6 && S.ih < 640;
     app.classList.toggle('dock', dock);
+    /* docked: the tabs sit over the board column and the coach card keeps the full height */
+    kidsBar.style.right = dock ? `calc(${coach.offsetWidth + gap}px + max(16px, env(safe-area-inset-right, 0px)))` : '';
+    const tabs = kidsBar.offsetHeight ? kidsBar.offsetHeight + 10 : 0;
     if (dock) {
-      const cw = coach.offsetWidth, chd = coach.offsetHeight, aw = S.iw - cw - gap;
-      const s = Math.max(.1, Math.min(aw / W, S.ih / H));
+      coach.style.maxHeight = S.ih + 'px';
+      const cw = coach.offsetWidth, chd = coach.offsetHeight, aw = S.iw - cw - gap, ah = S.ih - tabs;
+      const s = Math.max(.1, Math.min(aw / W, ah / H));
       coach.style.top = (S.y0 + Math.max(0, (S.ih - chd) / 2)) + 'px';
-      return { x: S.x0 + (aw - W * s) / 2, y: S.y0 + (S.ih - H * s) / 2, s };
+      return { x: S.x0 + (aw - W * s) / 2, y: S.y0 + tabs + (ah - H * s) / 2, s };
     }
+    coach.style.maxHeight = '';
+    S.y0 += tabs; S.ih -= tabs;
     const ch = coach.offsetHeight;
     const s = Math.max(.1, Math.min(S.iw / W, (S.ih - ch - gap) / H));
     const total = H * s + gap + ch;
@@ -1756,6 +1787,7 @@ canvas.confetti { position: absolute; inset: 0; width: 100%; height: 100%; point
       const list = slotFresh(id) ? [...(state.board.activities || [])] : [];
       const at = list.indexOf(v);
       if (at >= 0) {
+        if (run.added && run.added.v === v && performance.now() - run.added.t < 900) return;   /* a double tap, not "take it off" */
         run.token++;
         list.splice(at, 1); state.board.activities = list;
         /* taking every magnet off is not the same as "Nothing special today" */
@@ -1767,7 +1799,8 @@ canvas.confetti { position: absolute; inset: 0; width: 100%; height: 100%; point
       list.push(v);
       state.board.activities = list; state.setOn.activities = T.key;
       const plan = todayPlan().map(p => p.id);
-      const planDone = plan.length > 0 && plan.every(p => list.includes(p));
+      const planDone = plan.includes(v) && plan.every(p => list.includes(p));
+      run.added = { v, t: performance.now() };
       return place(id, from, planDone ? [...S.confirm(v), 'gen.planall'] : S.confirm(v), { stay: !planDone && list.length < MAX_ACTS });
     }
     state.board[id] = v; state.setOn[id] = T.key;
@@ -1835,8 +1868,11 @@ canvas.confetti { position: absolute; inset: 0; width: 100%; height: 100%; point
   function aheadLines() {
     const D = todayInfo(shifted(1)), f = forecast(1), plan = planFor(1, kid).map(p => p.id);
     const out = [{ ids: ['day.tom.' + D.wd] }];
-    if (D.todays) out.push({ ids: ['hol.next.' + D.todays.key, 'sleeps.1'] });
-    if (f) out.push({ ids: ['tmr.wx.' + f.weather] }, { ids: ['tmr.temp.' + f.temp] });
+    if (D.todays && D.todays.start === D.n) out.push({ ids: ['hol.next.' + D.todays.key, 'sleeps.1'] });
+    if (f && !f.sample) {
+      out.push({ ids: ['tmr.wx.' + f.weather] }, { ids: ['tmr.temp.' + f.temp] });
+      if (f.chilly && f.temp !== 'cold' && f.temp !== 'freezing') out.push({ ids: ['tmr.chilly'] });
+    }
     out.push({ ids: planIds(plan, 'tomorrow'), gap: .07 });
     return out;
   }
@@ -1855,9 +1891,9 @@ canvas.confetti { position: absolute; inset: 0; width: 100%; height: 100%; point
           <div class="ah-label">Weather</div>
           ${f ? `${tile(W.name, 't-sky dark-ink', null, W.em)}
           <span class="ah-band" style="--tc:${TP.c}">${TP.name} · up to ${f.hi}°</span>
-          <div class="ah-wear" aria-label="What to wear">${f.wear}</div>
-          ${f.sample ? '<div class="ah-note">Sample weather. At home this comes from the Family Hub’s forecast.</div>' : ''}`
-          : '<div class="ah-note">No weather report yet. It comes from the Family Hub when its ZIP code is set.</div>'}
+          ${f.sample ? '<div class="ah-note">Sample weather. At home this comes from the Family Hub’s forecast.</div>'
+            : `<div class="ah-wear" aria-label="What to wear">${f.wear}</div>${f.chilly && f.temp !== 'cold' && f.temp !== 'freezing' ? '<div class="ah-note">Chilly in the morning: bring a jacket.</div>' : ''}`}`
+          : `<div class="ah-note">${hubZip() ? 'No weather report right now. Try again in a little while.' : 'No weather report yet. It comes from the Family Hub when its ZIP code is set.'}</div>`}
         </section>
         <section class="ah-box">
           <div class="ah-label">${esc(kid.name)}’s plans</div>
@@ -1921,8 +1957,9 @@ canvas.confetti { position: absolute; inset: 0; width: 100%; height: 100%; point
   }
   function closeOverlay(el) {
     el.hidden = true; stopSpeech(); applyInert();
+    if (lastFocus && !document.contains(lastFocus) && lastAct) lastFocus = coach.querySelector(`[data-act="${lastAct}"]`);
     if (lastFocus && document.contains(lastFocus) && !lastFocus.closest('[inert]')) lastFocus.focus({ preventScroll: true });
-    lastFocus = null;
+    lastFocus = null; lastAct = null;
   }
   function readAll() {
     const all = lines();
@@ -1938,9 +1975,9 @@ canvas.confetti { position: absolute; inset: 0; width: 100%; height: 100%; point
   function celebrate() {
     state.celebrated = T.key; save();
     tada(); confetti();
-    const p = sayIds(['gen.done'], { delay: .6 });
+    const p = sayIds(['gen.done'], { delay: .6 }), who = kid.id;
     setTimeout(() => {
-      if (!rb.hidden) return;
+      if (!rb.hidden || !ahOverlay.hidden || !gpOverlay.hidden || kid.id !== who || run.mode !== 'overview') return;
       openReadback(false);
       Promise.race([p, wait(4000)]).then(() => { if (!rb.hidden) readAll(); });
     }, 1100);
@@ -2136,8 +2173,9 @@ canvas.confetti { position: absolute; inset: 0; width: 100%; height: 100%; point
   const tada = () => [523, 659, 784, 1047].forEach((f, i) => tone(f, i * .1, i === 3 ? .5 : .2, 'triangle', .1));
 
   /* ── Grown-ups ── */
-  let removing = null;
+  let removing = null, removingAt = 0, rtKid = null;
   function renderGrownups() {
+    const rk = kids.find(k => k.id === rtKid) || kid;
     const vs = deviceVoices().slice(0, 12);
     const dv = deviceVoice();
     gp.innerHTML = `
@@ -2149,14 +2187,18 @@ canvas.confetti { position: absolute; inset: 0; width: 100%; height: 100%; point
           <select data-k="avatar" aria-label="${esc(k.name)}’s picture">${AVATARS.map(a => `<option${a === k.avatar ? ' selected' : ''}>${a}</option>`).join('')}</select>
           <input type="text" data-k="name" value="${esc(k.name)}" maxlength="20" autocomplete="off" aria-label="Name">
           <label class="chk"><input type="checkbox" data-k="school"${k.school ? ' checked' : ''}> Goes to school</label>
-          ${kids.length > 1 ? `<button class="btn quiet" type="button" data-k="remove">${removing === k.id ? 'Tap again to remove' : 'Remove'}</button>` : ''}
-        </div>`).join('')}
+          ${kids.length > 1 && removing !== k.id ? '<button class="btn quiet" type="button" data-k="remove">Remove</button>' : ''}
+        </div>
+        ${removing === k.id ? `<div class="kid-confirm" data-kid-row="${k.id}">Remove ${esc(k.name)} and ${esc(k.name)}’s board?
+          <button class="btn quiet" type="button" data-k="cancel">Cancel</button>
+          <button class="btn danger" type="button" data-k="confirm">Yes, remove</button></div>` : ''}`).join('')}
         ${kids.length < 4 ? '<div class="row" style="margin-top:8px"><button class="btn quiet" type="button" data-gp="add-kid">+ Add a child</button></div>' : ''}
       </div>
       <div>
-        <h3>${esc(kid.name)}’s weekly routine</h3>
-        <p>${kid.example ? 'These are examples. Change them to match your week. ' : ''}Tap the days each one happens. “School days only” skips breaks and holidays on the school calendar.</p>
-        <div class="routine">${ROUTINE_ACTS().map(a => { const r = kid.routine[a.id] || { days: [], schoolOnly: false }; return `
+        <h3>Weekly routine</h3>
+        ${kids.length > 1 ? `<div class="seg" role="group" aria-label="Whose routine" style="margin-bottom:8px">${kids.map(k => `<button type="button" data-rt-kid="${k.id}" aria-pressed="${k.id === rk.id}">${k.avatar} ${esc(k.name)}</button>`).join('')}</div>` : ''}
+        <p>${rk.example ? (sampleMode() ? 'These are examples, shown in the sample. ' : 'These are examples and aren’t used yet. <button class="btn quiet" type="button" data-gp="use-example">Use these</button> or tap the days to make your own. ') : ''}Tap the days each one happens. “School days only” skips breaks, holidays and school-at-home days.</p>
+        <div class="routine">${ROUTINE_ACTS().map(a => { const r = rk.routine[a.id] || { days: [], schoolOnly: false }; return `
           <div class="rt-row" data-rt="${a.id}">
             <span class="rt-name">${a.em} ${a.name}</span>
             <span class="rt-days">${'SMTWTFS'.split('').map((c, i) => `<button type="button" class="rt-day" data-day="${i}" aria-pressed="${r.days.includes(i)}" aria-label="${DAYS[i]}">${c}</button>`).join('')}</span>
@@ -2293,7 +2335,7 @@ canvas.confetti { position: absolute; inset: 0; width: 100%; height: 100%; point
     if (a === 'coach-say') sayIds([coachMsgId()]);
     if (a === 'readback') openReadback(true);
     if (a === 'ahead') openAhead();
-    if (a === 'grownups') { removing = null; renderGrownups(); openOverlay(gpOverlay); }
+    if (a === 'grownups') { removing = null; rtKid = null; renderGrownups(); openOverlay(gpOverlay); }
   });
   back.addEventListener('click', () => { audioCtx(); if (run.mode === 'zoom') zoomOut(); });
 
@@ -2317,29 +2359,37 @@ canvas.confetti { position: absolute; inset: 0; width: 100%; height: 100%; point
     if (v) { prefs.voice = v.dataset.voice; savePrefs(); renderGrownups(); if (prefs.voice !== 'off') sayIds(['gen.try']); else stopSpeech(); return; }
     const s = e.target.closest('[data-sound]');
     if (s) { prefs.sound = s.dataset.sound === 'on'; savePrefs(); renderGrownups(); if (prefs.sound) chime(); return; }
+    const rtk = e.target.closest('[data-rt-kid]');
+    if (rtk) { rtKid = rtk.dataset.rtKid; renderGrownups(); const b = gp.querySelector(`[data-rt-kid="${rtKid}"]`); if (b) b.focus(); return; }
     const day = e.target.closest('.rt-day');
     if (day) {
+      const rk = kids.find(k => k.id === rtKid) || kid;
       const id = day.closest('[data-rt]').dataset.rt, d = +day.dataset.day;
-      const r = kid.routine[id] || (kid.routine[id] = { days: [], schoolOnly: false });
+      const r = rk.routine[id] || (rk.routine[id] = { days: [], schoolOnly: false });
       r.days = r.days.includes(d) ? r.days.filter(x => x !== d) : [...r.days, d].sort();
-      if (!r.days.length) delete kid.routine[id];
-      kid.example = false; saveKids(); renderGrownups(); renderAll();
+      if (!r.days.length) delete rk.routine[id];
+      rk.example = false; saveKids(); renderGrownups(); renderAll();
+      const again = gp.querySelector(`[data-rt="${id}"] [data-day="${d}"]`); if (again) again.focus({ preventScroll: true });
       return;
     }
-    const rm = e.target.closest('[data-k="remove"]');
-    if (rm) {
-      const id = rm.closest('[data-kid-row]').dataset.kidRow;
-      if (removing !== id) { removing = id; renderGrownups(); return; }
+    const kb = e.target.closest('[data-k="remove"], [data-k="cancel"], [data-k="confirm"]');
+    if (kb) {
+      const id = kb.closest('[data-kid-row]').dataset.kidRow, what = kb.dataset.k;
+      if (what === 'remove') { removing = id; removingAt = Date.now(); renderGrownups(); return; }
+      if (what === 'cancel' || Date.now() - removingAt < 700) { if (what === 'cancel') { removing = null; renderGrownups(); } return; }
       removing = null;
+      if (dayOffset) setDay(0);
       kids = kids.filter(k => k.id !== id); saveKids();
       try { localStorage.removeItem(boardKey(id)); } catch (err) {}
-      if (kid.id === id) { kid = kids[0]; prefs.kid = kid.id; savePrefs(); state = loadBoard(kid.id); }
+      if (kid.id === id) { kid = kids[0]; prefs.kid = kid.id; savePrefs(); state = loadBoard(kid.id); run.misses = {}; run.wrong = {}; }
+      if (rtKid === id) rtKid = null;
       renderTabs(); renderGrownups(); zoomOut({ announce: false });
       return;
     }
     const g = e.target.closest('[data-gp]'); if (!g) return;
     const a = g.dataset.gp;
     if (a === 'try') return sayIds(['gen.try']);
+    if (a === 'use-example') { const rk = kids.find(k => k.id === rtKid) || kid; rk.example = false; saveKids(); renderGrownups(); renderAll(); return; }
     if (a === 'add-kid') {
       const used = kids.map(k => k.avatar), i = kids.length;
       kids.push({ id: 'k' + Date.now().toString(36), name: 'Kid ' + (i + 1), avatar: AVATARS.find(x => !used.includes(x)) || AVATARS[0], color: KID_COLORS[i % KID_COLORS.length], school: true, example: false, routine: {} });
@@ -2378,12 +2428,15 @@ canvas.confetti { position: absolute; inset: 0; width: 100%; height: 100%; point
       if (f === 'name') k.name = cleanName(e.target.value) || k.name;
       if (f === 'avatar' && AVATARS.includes(e.target.value)) k.avatar = e.target.value;
       if (f === 'school') k.school = e.target.checked;
-      saveKids(); renderTabs(); renderGrownups(); renderAll(); setCam(currentCam(), true);
+      /* no panel rebuild here: it would swallow the tap that caused the change */
+      saveKids(); renderTabs(); renderAll(); setCam(currentCam(), true);
+      gp.querySelectorAll(`[data-rt-kid="${k.id}"]`).forEach(b => { b.textContent = `${k.avatar} ${k.name}`; });
       return;
     }
     if (e.target.matches('[data-rt-school]')) {
-      const r = kid.routine[e.target.closest('[data-rt]').dataset.rt];
-      if (r) { r.schoolOnly = e.target.checked; kid.example = false; saveKids(); renderAll(); }
+      const rk = kids.find(k => k.id === rtKid) || kid;
+      const r = rk.routine[e.target.closest('[data-rt]').dataset.rt];
+      if (r) { r.schoolOnly = e.target.checked; rk.example = false; saveKids(); renderAll(); }
     }
   });
   try { speechSynthesis.addEventListener('voiceschanged', () => { if (!gpOverlay.hidden) renderGrownups(); }); } catch (e) {}
@@ -2401,6 +2454,26 @@ canvas.confetti { position: absolute; inset: 0; width: 100%; height: 100%; point
     clearTimeout(rt);
     rt = setTimeout(() => { orient(); setCam(currentCam(), true); }, 60);
   });
+
+  /* The hub may have refreshed (or a grown-up added an event): re-read its data and redraw when it changed */
+  let hubSig = '';
+  const sigOf = () => JSON.stringify([HUB.wx && HUB.wx.ts, hubMembers().map(m => { const d = HUB.data[m.id] || {}; return [d.at, d.calAt, (d.calendar || []).length]; })]);
+  function syncHub() {
+    HUB.cfg = readLS('hub.cfg'); HUB.data = readLS('hub.data') || {}; HUB.wx = readLS('hub.wx');
+    return Promise.all([refreshCalendar(), refreshWeather()]).then(() => {
+      const sig = sigOf();
+      if (sig === hubSig) return;
+      hubSig = sig;
+      if (run.busy || run.lock) return;
+      renderAll();
+      if (run.mode === 'zoom') renderTray();
+      if (!ahOverlay.hidden) renderAhead();
+    });
+  }
+  addEventListener('storage', e => { if (e.key && /^hub\./.test(e.key)) syncHub(); });
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') syncHub(); });
+  addEventListener('pageshow', e => { if (e.persisted) syncHub(); });
+  setInterval(() => { if (document.visibilityState !== 'hidden') syncHub(); }, 5 * 60e3);
 
   /* A new day re-checks which parts need updating */
   setInterval(() => {
@@ -2426,12 +2499,8 @@ canvas.confetti { position: absolute; inset: 0; width: 100%; height: 100%; point
   renderTabs();
   try { renderAll(); } catch (e) { state = sampleState(); renderAll(); }
   /* fresh calendar and weather from the hub's sources, then redraw what depends on them */
-  Promise.all([refreshCalendar(), refreshWeather()]).then(([c, w]) => {
-    if (!c && !w) return;
-    renderAll();
-    if (run.mode === 'zoom') renderTray();
-    if (!ahOverlay.hidden) renderAhead();
-  });
+  hubSig = sigOf();
+  syncHub();
   setCam(overviewCam(), true);
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => setCam(currentCam(), true));
 })();
