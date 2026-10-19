@@ -1,0 +1,9 @@
+venv/
+clips/
+model.onnx
+*.bin
+voices.npz
+catalog*.json
+sprite-*.wav
+verify*.json
+*.log

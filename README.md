@@ -7,6 +7,7 @@ Single-file pages, no build step, no app store. Open one and add it to the home 
 | `index.html` | Paul | The morning routine: timed steps, voice prompts, ball jar. |
 | `tracker.html` | Mom and Dad | Behavior data: non-compliance, toileting accidents, tantrums. |
 | `hub.html` | The whole family | A Skylight-style wall display: week calendar with school dates from APS email, today's meals, a shared list, and a photo frame. |
+| `calendar.html` | Paul and Ellie | A digital version of the magnetic My Daily Calendar board: date, days, season, weather, plans and feelings, with a recorded voice. |
 
 ## tracker.html
 
@@ -309,3 +310,52 @@ photo, and the weather ZIP are all in Settings.
 
 The family list lives in the first person's script, so it's the same on every screen that
 uses that script. Checked items clear after two days or with **Clear checked**.
+
+## calendar.html — My Daily Calendar
+
+The wooden magnet board from the morning circle, on the tablet. The whole board shows first.
+The parts that need a new magnet today **glow** and yesterday's magnet fades; the parts that
+are still right (month, year, season, most days the holiday) get a green check. Tap a glowing
+part and the board **zooms in** to it, with that part's magnets beside it. Answers with a right
+answer are checked against the date: one wrong tap gets a hint, a second makes the right magnet
+glow. When everything is done there's confetti and **Read it back** reads the board as
+sentences, one line at a time.
+
+It opens from **📅 My calendar** in Paul's view on the hub, or on its own; add it to the home
+screen like the other pages.
+
+**Paul and Ellie.** Each child has a name tab at the top, their own board and their own weekly
+routine. The first name comes from the hub's *Child's name*. Names, pictures, "Goes to school",
+and adding or removing a child are in **⚙️ → Children**.
+
+**Plans, not a pile of magnets.** The Activities part starts from the day's plan, which is put
+together from three places:
+- **School or home day**, with the same rules as Paul's view (weekends, breaks and closures on
+  the APS calendar, anything titled "No school" or "Home day").
+- **The weekly routine** in ⚙️: tap the days for ABA, Gym, Library and the rest, with "School
+  days only" for things like gym class that skip breaks and holidays. The first routine is an
+  example to change.
+- **Calendar events with the child's name in the title**, like `Paul – dentist`, `Ellie library`
+  or `Paul ABA`. "Kids" counts for everyone. It knows ABA, gym/PE, library, doctor, dentist,
+  birthday, party, play date, piano/music, soccer/swim/practice, park and vacation.
+
+The planned magnets show as outlines on the board and come first in the tray ("Let's put
+today's plan on the board!"), so the job is matching, not guessing. Up to four fit.
+
+**Weather.** With a ZIP code in the hub's Settings, the temperature and weather questions add
+"The weather report says it will be cool today." The child still picks: it's an observation,
+not a test.
+
+**Tomorrow.** 🌙 **Tomorrow** (and *What about tomorrow?* after Read it back) shows the next day:
+the day, the weather with what to wear, and the plan, read aloud. Good for bedtime.
+
+**The voice** is recorded ahead of time (`voice/`, about 4 MB) so it sounds the same and natural
+on every device; the device's own voice fills in only if a file can't load. ⚙️ has Voice
+(natural / device / off), Sounds, **Pretend it's tomorrow** to preview a normal morning,
+**See it finished**, and an empty board.
+
+Everything is stored on the device: each child's board and the routines. It reads the hub's
+calendar and forecast from the same browser, so use it on the device where the hub is set up
+(the tablet, or Chrome on a phone with the hub's setup link). An iPhone Home Screen app keeps
+its own storage, so there it shows a sample forecast and uses only the routine. To change what
+the voice says, see `tools/voice/README.md`.
