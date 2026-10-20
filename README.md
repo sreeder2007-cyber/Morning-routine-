@@ -324,6 +324,11 @@ sentences, one line at a time.
 It opens from **📅 My calendar** in Paul's view on the hub, or on its own; add it to the home
 screen like the other pages.
 
+The board takes up almost the whole screen. A slim bar of small icons (down the left side when
+the tablet is sideways, along the top on a phone held upright) holds the name tabs and: 🔊 what
+to do next, 📖 Read it back (it lights up once the board is done), 🌙 Tomorrow, ⚙️ grown-ups,
+and 🏠 back to the Family Hub.
+
 **Paul and Ellie.** Each child has a name tab at the top, their own board and their own weekly
 routine. The first name comes from the hub's *Child's name*. Names, pictures, "Goes to school",
 and adding or removing a child are in **⚙️ → Children**.

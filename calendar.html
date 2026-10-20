@@ -20,10 +20,11 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Andika:wght@400;700&family=Fredoka:wght@500;600;700&family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
 <style>
-/* Layout: the whole wooden board is a "camera" stage. Overview fits the board to the screen with a coach
-   card under it; tapping a section zooms the camera onto that section and slides in the magnet tray
-   (right side in landscape, bottom sheet in portrait). One deliberate look in every theme: bright toy
-   board on Paul's night sky. Board internals are drawn at a fixed 1200px design width and scaled. */
+/* Layout: the whole wooden board is a "camera" stage that fills the screen. A slim icon bar holds the
+   name tabs and a few small tools: a rail on the left in landscape, a strip on top in portrait. Tapping a
+   section zooms the camera onto it and slides in the magnet tray (right side in landscape, bottom sheet
+   in portrait). One deliberate look in every theme: bright toy board on Paul's night sky. Board internals
+   are drawn at a fixed 1200px design width and scaled. */
 :root {
   color-scheme: dark;
   --night: #1a0a2e;
@@ -319,45 +320,6 @@ button:focus-visible, [role="button"]:focus-visible { outline: 3px solid var(--y
 .level.on small { color: rgba(255, 255, 255, .85); }
 .slot-temp.active .thermo { background: color-mix(in srgb, var(--yellow) 18%, transparent); box-shadow: 0 0 0 3px var(--yellow); }
 
-/* ── Overview coach card ── */
-.coach {
-  position: absolute; z-index: 8;
-  left: max(16px, env(safe-area-inset-left, 0px)); right: max(16px, env(safe-area-inset-right, 0px));
-  margin: 0 auto; max-width: 980px;
-  display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px;
-  padding: 12px 14px;
-  background: #fffdf7; color: var(--ink);
-  border-radius: 20px;
-  box-shadow: 0 14px 40px rgba(0, 0, 0, .45);
-  transition: opacity .35s, transform .45s;
-}
-.app[data-mode="zoom"] .coach { opacity: 0; transform: translateY(30px); pointer-events: none; }
-.coach .head { flex: 1 1 300px; min-width: 0; display: flex; align-items: center; gap: 12px; }
-.coach .star { width: clamp(36px, 9vw, 52px); height: clamp(36px, 9vw, 52px); flex: none; }
-.coach .msg { flex: 1; min-width: 0; display: grid; gap: 6px; }
-.coach .msg b { font: 600 clamp(18px, 2.2vw, 23px)/1.2 var(--display); text-wrap: balance; }
-.coach .small { font: 700 13px/1.3 var(--ui); color: var(--ink-soft); }
-.chips { display: flex; flex-wrap: wrap; gap: 6px; }
-.chip-sec {
-  --c: var(--blue);
-  font: 800 13px/1 var(--ui); color: #fff; letter-spacing: .02em;
-  background: var(--c); padding: 7px 11px 6px; border-radius: 999px;
-  box-shadow: 0 2px 0 color-mix(in srgb, var(--c) 60%, #000);
-}
-.coach .acts-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-.app.dock .coach {
-  left: auto; right: max(16px, env(safe-area-inset-right, 0px));
-  width: min(300px, 40%); margin: 0;
-  flex-direction: column; flex-wrap: nowrap; align-items: stretch;
-  max-height: calc(100% - 24px); overflow-y: auto;
-}
-.app.dock .coach .head { flex: none; align-items: flex-start; }
-.app.dock .coach .acts-row { justify-content: space-between; }
-@media (max-width: 420px) {
-  .coach { padding: 10px 12px; }
-  .coach .acts-row .btn { padding: 12px 14px; font-size: 15px; }
-}
-
 .round {
   flex: none; width: 46px; height: 46px; border-radius: 50%;
   display: grid; place-items: center;
@@ -377,25 +339,68 @@ button:focus-visible, [role="button"]:focus-visible { outline: 3px solid var(--y
 .btn.big { font-size: 19px; padding: 16px 22px; }
 .btn[disabled] { opacity: .45; pointer-events: none; }
 
-/* ── Whose calendar: name tabs ── */
-.kids {
-  position: absolute; z-index: 9; top: 10px;
-  left: max(16px, env(safe-area-inset-left, 0px)); right: max(16px, env(safe-area-inset-right, 0px));
-  display: flex; justify-content: safe center; gap: 10px; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; pointer-events: none;
-  transition: opacity .3s, transform .3s;
+/* ── The icon bar: name tabs and small tools ── */
+.bar { position: absolute; z-index: 9; display: flex; align-items: center; gap: 8px; transition: opacity .3s, transform .3s; }
+.app[data-orient="port"] .bar {
+  top: 10px; left: max(12px, env(safe-area-inset-left, 0px)); right: max(12px, env(safe-area-inset-right, 0px));
+  flex-wrap: wrap;
 }
+.app[data-orient="land"] .bar {
+  top: 12px; bottom: 12px; left: max(10px, env(safe-area-inset-left, 0px)); width: 64px;
+  flex-direction: column;
+}
+.app[data-mode="zoom"] .bar { opacity: 0; pointer-events: none; }
+.app[data-orient="port"][data-mode="zoom"] .bar { transform: translateY(-10px); }
+.app[data-orient="land"][data-mode="zoom"] .bar { transform: translateX(-10px); }
+.kids { display: flex; gap: 6px; min-width: 0; min-height: 0; scrollbar-width: none; }
 .kids:empty { display: none; }
+.app[data-orient="port"] .kids { flex: 0 1 auto; overflow-x: auto; }
+.app[data-orient="land"] .kids { flex-direction: column; overflow-y: auto; }
+.tools { display: flex; align-items: center; gap: 6px; flex: none; }
+.app[data-orient="port"] .tools { margin-left: auto; }
+.app[data-orient="land"] .tools { flex-direction: column; margin-top: auto; }
 .kid-tab {
-  pointer-events: auto; flex: none;
   --kc: var(--blue);
-  display: inline-flex; align-items: center; gap: 8px;
-  font: 700 18px/1 var(--display); color: var(--star);
-  padding: 8px 16px 8px 10px; border-radius: 999px;
+  flex: none; display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 12px 4px 4px; border-radius: 999px;
+  font: 700 15px/1 var(--display); color: var(--star);
   background: rgba(255, 255, 255, .08); box-shadow: inset 0 0 0 2px rgba(255, 255, 255, .18);
 }
-.kid-tab .av { font-size: 24px; line-height: 1; }
-.kid-tab[aria-pressed="true"] { background: var(--kc); color: #fff; box-shadow: 0 3px 0 color-mix(in srgb, var(--kc) 60%, #000), 0 0 0 3px rgba(255, 255, 255, .85); }
-.app[data-mode="zoom"] .kids { opacity: 0; transform: translateY(-10px); }
+.kid-tab .av { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-size: 21px; line-height: 1; background: rgba(255, 255, 255, .12); }
+.kid-tab .nm { max-width: 8em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kid-tab[aria-pressed="true"] { background: var(--kc); color: #fff; box-shadow: 0 3px 0 color-mix(in srgb, var(--kc) 60%, #000), 0 0 0 2px rgba(255, 255, 255, .85); }
+.app[data-orient="land"] .kid-tab { flex-direction: column; gap: 3px; width: 64px; padding: 5px 3px 6px; border-radius: 16px; font-size: 12px; }
+.app[data-orient="land"] .kid-tab .nm { max-width: 58px; }
+.tool {
+  flex: none; width: 42px; height: 42px; border-radius: 50%;
+  display: grid; place-items: center; position: relative;
+  color: var(--star); text-decoration: none;
+  background: rgba(255, 255, 255, .1); box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, .22);
+}
+.tool svg { width: 21px; height: 21px; }
+.tool:hover { background: rgba(255, 255, 255, .2); }
+.tool:focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
+/* everything is on the board: Read it back lights up */
+.tool.ready { background: var(--yellow); color: var(--ink); box-shadow: 0 3px 0 #c79c00; animation: ready 1.6s ease-in-out infinite; }
+@keyframes ready { 50% { box-shadow: 0 3px 0 #c79c00, 0 0 0 8px rgba(255, 210, 63, .3); } }
+.practice { font: 800 10px/1.1 var(--ui); letter-spacing: .04em; text-transform: uppercase; color: var(--night); background: var(--yellow); border-radius: 6px; padding: 4px 6px; text-align: center; }
+@media (max-width: 400px) {
+  .tool { width: 38px; height: 38px; }
+  .app[data-orient="port"] .kid-tab { padding: 3px; }
+  .app[data-orient="port"] .kid-tab .nm { display: none; }
+}
+@media (max-height: 420px) {
+  .tool { width: 36px; height: 36px; }
+  .tool svg { width: 19px; height: 19px; }
+  .app[data-orient="land"] .kid-tab .av { width: 30px; height: 30px; font-size: 19px; }
+}
+/* very short sideways phones: pictures only on the tabs, so both children and every tool fit */
+@media (max-height: 360px) {
+  .bar, .tools, .kids { gap: 5px; }
+  .tool { width: 34px; height: 34px; }
+  .app[data-orient="land"] .kid-tab { padding: 4px 3px; }
+  .app[data-orient="land"] .kid-tab .nm { display: none; }
+}
 
 /* ── Tomorrow ── */
 .ahead { --fs: clamp(16px, 4.6cqi, 26px); }
@@ -647,8 +652,10 @@ canvas.confetti { position: absolute; inset: 0; width: 100%; height: 100%; point
     </div>
   </div>
 
-  <nav class="kids" id="kids" aria-label="Whose calendar"></nav>
-  <div class="coach" id="coach"></div>
+  <header class="bar" id="bar">
+    <nav class="kids" id="kids" aria-label="Whose calendar"></nav>
+    <div class="tools" id="tools" role="toolbar" aria-label="Calendar tools"></div>
+  </header>
 
   <button class="back" id="back" type="button">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M7.5 10.5h6M15.5 15.5L20 20"/></svg>
@@ -1355,12 +1362,13 @@ canvas.confetti { position: absolute; inset: 0; width: 100%; height: 100%; point
     check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
     gear: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>'
   };
+  ICON.home = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11.5L12 4l9 7.5"/><path d="M5.5 10v10h4.5v-6h4v6h4.5V10"/></svg>';
+  ICON.book = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 5h6a4 4 0 0 1 4 4v12a3 3 0 0 0-3-3H2z"/><path d="M22 5h-6a4 4 0 0 0-4 4v12a3 3 0 0 1 3-3h7z"/></svg>';
   ICON.moon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg>';
-  const STAR = '<svg class="star" viewBox="0 0 100 100" aria-hidden="true"><path d="M50 6l12.6 27.4 29.9 3.4-22.3 20.3 6.2 29.5L50 71.6 23.6 86.6l6.2-29.5L7.5 36.8l29.9-3.4z" fill="#ffd23f" stroke="#e0a800" stroke-width="4" stroke-linejoin="round"/><circle cx="40" cy="48" r="4" fill="#3b2a12"/><circle cx="60" cy="48" r="4" fill="#3b2a12"/><path d="M40 60 Q50 69 60 60" fill="none" stroke="#3b2a12" stroke-width="4" stroke-linecap="round"/></svg>';
 
   /* ── Elements ── */
   const $ = s => document.querySelector(s);
-  const app = $('#app'), stage = $('#stage'), camera = $('#camera'), board = $('#board'), coach = $('#coach');
+  const app = $('#app'), stage = $('#stage'), camera = $('#camera'), board = $('#board'), bar = $('#bar'), tools = $('#tools');
   const tray = $('#tray'), surface = $('#surface'), back = $('#back'), live = $('#live');
   const rb = $('#readback'), rbLines = $('#lines'), gpOverlay = $('#grownups'), gp = $('#gp');
   const kidsBar = $('#kids'), ahOverlay = $('#ahead'), ahBody = $('#ah-body');
@@ -1510,15 +1518,14 @@ canvas.confetti { position: absolute; inset: 0; width: 100%; height: 100%; point
       el.setAttribute('role', isFocus ? 'group' : 'button');
       el.setAttribute('aria-label', `${s.name}: ${isStale ? 'needs updating' : 'all set'}`);
     });
-    renderCoach();
+    renderTools();
     applyInert();
   }
   /* hidden controls stay out of reach for taps, Tab and screen readers */
   function applyInert() {
     const modal = !rb.hidden || !gpOverlay.hidden || !ahOverlay.hidden;
     stage.inert = modal;
-    kidsBar.inert = modal || run.mode === 'zoom';
-    coach.inert = modal || run.mode === 'zoom';
+    bar.inert = modal || run.mode === 'zoom';
     back.inert = tray.inert = modal || run.mode !== 'zoom';
   }
   let lastFocus = null, lastAct = null;
@@ -1533,7 +1540,7 @@ canvas.confetti { position: absolute; inset: 0; width: 100%; height: 100%; point
 
   /* ── Name tabs ── */
   function renderTabs() {
-    kidsBar.innerHTML = kids.length < 2 ? '' : kids.map(k => `<button class="kid-tab" type="button" data-kid="${k.id}" style="--kc:${k.color}" aria-pressed="${k.id === kid.id}"><span class="av" aria-hidden="true">${k.avatar}</span>${esc(k.name)}</button>`).join('');
+    kidsBar.innerHTML = kids.length < 2 ? '' : kids.map(k => `<button class="kid-tab" type="button" data-kid="${k.id}" style="--kc:${k.color}" aria-pressed="${k.id === kid.id}" aria-label="${esc(k.name)}" title="${esc(k.name)}"><span class="av" aria-hidden="true">${k.avatar}</span><span class="nm" aria-hidden="true">${esc(k.name)}</span></button>`).join('');
   }
   function switchKid(id) {
     if (id === kid.id || !kids.some(k => k.id === id)) return;
@@ -1549,33 +1556,26 @@ canvas.confetti { position: absolute; inset: 0; width: 100%; height: 100%; point
     zoomOut({ announce: false }).then(() => sayIds([coachMsgId()]));
   }
 
-  /* ── Coach card (overview) ── */
+  /* ── Small tools (overview) ── */
   function coachMsgId() {
     const stale = staleSecs();
     if (!stale.length) return 'gen.done';
     if (stale.length === SECTIONS.length) return 'gen.start';
     return run.prompted ? 'next.' + stale[0] : 'gen.morning';
   }
-  function renderCoach() {
-    const stale = staleSecs();
-    const id = coachMsgId();
-    const note = dayOffset ? `Practice: pretending it’s ${DAYS[T.wd]}, ${MONTHS[T.m]} ${T.d}.` : '';
-    coach.style.setProperty('--kc', kid.color);
-    coach.innerHTML = `
-      <div class="head">
-        ${STAR}
-        <div class="msg">
-          <b>${CAT[id].text}</b>
-          ${stale.length && stale.length < SECTIONS.length ? `<div class="chips">${stale.map(s => `<button class="chip-sec" type="button" data-go="${s}" style="--c:var(--${SEC[s].panel})">${SEC[s].name}</button>`).join('')}</div>` : ''}
-          ${note ? `<span class="small">${note}</span>` : ''}
-        </div>
-      </div>
-      <div class="acts-row">
-        <button class="round" type="button" data-act="coach-say" aria-label="Say it">${ICON.speaker}</button>
-        <button class="btn${stale.length ? ' quiet' : ''}" type="button" data-act="readback">${ICON.speaker} Read it back</button>
-        <button class="btn quiet" type="button" data-act="ahead">${ICON.moon} Tomorrow</button>
-        <button class="round" type="button" data-act="grownups" aria-label="Grown-ups settings">${ICON.gear}</button>
-      </div>`;
+  /* built once, then only updated, so a focused button keeps its focus */
+  function renderTools() {
+    if (!tools.children.length) tools.innerHTML = `
+      <span class="practice" hidden>Practice</span>
+      <button class="tool" type="button" data-act="say" title="What do I do?" aria-label="What do I do?">${ICON.speaker}</button>
+      <button class="tool" type="button" data-act="readback" title="Read it back" aria-label="Read it back">${ICON.book}</button>
+      <button class="tool" type="button" data-act="ahead" title="Tomorrow" aria-label="Tomorrow">${ICON.moon}</button>
+      <button class="tool" type="button" data-act="grownups" title="Grown-ups" aria-label="Grown-ups">${ICON.gear}</button>
+      <a class="tool" href="hub.html" title="Family Hub" aria-label="Family Hub">${ICON.home}</a>`;
+    const pr = tools.querySelector('.practice');
+    pr.hidden = !dayOffset;
+    pr.title = dayOffset ? `Practice: pretending it’s ${DAYS[T.wd]}, ${MONTHS[T.m]} ${T.d}` : '';
+    tools.querySelector('[data-act="readback"]').classList.toggle('ready', !staleSecs().length);
   }
 
   /* ── Magnet tray (zoom) ── */
@@ -1662,27 +1662,12 @@ canvas.confetti { position: absolute; inset: 0; width: 100%; height: 100%; point
   }
   function overviewCam() {
     const S = stageBox();
-    const W = board.offsetWidth, H = board.offsetHeight, gap = 14;
-    const dock = S.iw / S.ih > 1.6 && S.ih < 640;
-    app.classList.toggle('dock', dock);
-    /* docked: the tabs sit over the board column and the coach card keeps the full height */
-    kidsBar.style.right = dock ? `calc(${coach.offsetWidth + gap}px + max(16px, env(safe-area-inset-right, 0px)))` : '';
-    const tabs = kidsBar.offsetHeight ? kidsBar.offsetHeight + 10 : 0;
-    if (dock) {
-      coach.style.maxHeight = S.ih + 'px';
-      const cw = coach.offsetWidth, chd = coach.offsetHeight, aw = S.iw - cw - gap, ah = S.ih - tabs;
-      const s = Math.max(.1, Math.min(aw / W, ah / H));
-      coach.style.top = (S.y0 + Math.max(0, (S.ih - chd) / 2)) + 'px';
-      return { x: S.x0 + (aw - W * s) / 2, y: S.y0 + tabs + (ah - H * s) / 2, s };
-    }
-    coach.style.maxHeight = '';
-    S.y0 += tabs; S.ih -= tabs;
-    const ch = coach.offsetHeight;
-    const s = Math.max(.1, Math.min(S.iw / W, (S.ih - ch - gap) / H));
-    const total = H * s + gap + ch;
-    const y = S.y0 + Math.max(0, (S.ih - total) / 2);
-    coach.style.top = (y + H * s + gap) + 'px';
-    return { x: S.x0 + (S.iw - W * s) / 2, y, s };
+    const W = board.offsetWidth, H = board.offsetHeight, gap = 10;
+    /* offsets, not bounding boxes: the bar may still be sliding back in */
+    if (app.dataset.orient === 'land') { const edge = bar.offsetLeft + bar.offsetWidth + gap; if (edge > S.x0) { S.iw -= edge - S.x0; S.x0 = edge; } }
+    else { const edge = bar.offsetTop + bar.offsetHeight + gap; if (edge > S.y0) { S.ih -= edge - S.y0; S.y0 = edge; } }
+    const s = Math.max(.1, Math.min(S.iw / W, S.ih / H));
+    return { x: S.x0 + (S.iw - W * s) / 2, y: S.y0 + (S.ih - H * s) / 2, s };
   }
   function zoomCam(secId) {
     const S = stageBox();
@@ -1957,7 +1942,7 @@ canvas.confetti { position: absolute; inset: 0; width: 100%; height: 100%; point
   }
   function closeOverlay(el) {
     el.hidden = true; stopSpeech(); applyInert();
-    if (lastFocus && !document.contains(lastFocus) && lastAct) lastFocus = coach.querySelector(`[data-act="${lastAct}"]`);
+    if (lastFocus && !document.contains(lastFocus) && lastAct) lastFocus = tools.querySelector(`[data-act="${lastAct}"]`);
     if (lastFocus && document.contains(lastFocus) && !lastFocus.closest('[inert]')) lastFocus.focus({ preventScroll: true });
     lastFocus = null; lastAct = null;
   }
@@ -2326,13 +2311,11 @@ canvas.confetti { position: absolute; inset: 0; width: 100%; height: 100%; point
     }
   });
 
-  coach.addEventListener('click', e => {
+  tools.addEventListener('click', e => {
     audioCtx();
-    const go = e.target.closest('[data-go]');
-    if (go) return tapSection(go.dataset.go);
     const act = e.target.closest('[data-act]'); if (!act) return;
     const a = act.dataset.act;
-    if (a === 'coach-say') sayIds([coachMsgId()]);
+    if (a === 'say') sayIds([coachMsgId()]);
     if (a === 'readback') openReadback(true);
     if (a === 'ahead') openAhead();
     if (a === 'grownups') { removing = null; rtKid = null; renderGrownups(); openOverlay(gpOverlay); }
