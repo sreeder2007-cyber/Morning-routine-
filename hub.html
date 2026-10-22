@@ -283,6 +283,9 @@
   .kw-scale i.on { opacity: 1; height: 22px; margin-top: -4px; box-shadow: 0 0 0 3px #fff; }
   .kid-mini em { display: block; margin-top: 4px; font-style: normal; font-size: 15px; font-weight: 900; border-radius: 8px; padding: 1px 0; background: var(--tb); color: #fff; }
   .kid-edit { border: 0; background: none; color: inherit; font: inherit; text-decoration: underline; cursor: pointer; }
+  .kid-cal { display: flex; align-items: center; justify-content: center; gap: 14px; width: 100%; padding: 16px 20px; border-radius: 30px;
+    background: #ffd23f; color: #1d2340; font-size: 34px; font-weight: 900; text-decoration: none; box-shadow: 0 5px 0 #c79c00; }
+  .kid-cal span { font-size: 44px; line-height: 1; }
   .kid-grid { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 28px; width: min(1240px, 100%); align-items: start; }
   .kid-col { display: flex; flex-direction: column; gap: 22px; align-items: center; min-width: 0; }
   .kid-grid .kid-today { width: 100%; padding: 20px 20px 24px; }
@@ -1317,6 +1320,7 @@
             </button>`; }).join('')}</div>
         </div>
         <div class="kid-col">
+          <a class="kid-cal" href="calendar.html"><span aria-hidden="true">📅</span> My calendar</a>
           <section class="kid-panel">
             <h3>${allDone ? '🎉 All done!' : 'My jobs'}</h3>
             ${jobs.length ? `<div class="kid-jobs">${jobs.map(j => `

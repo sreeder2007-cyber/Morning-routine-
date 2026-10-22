@@ -1,0 +1,2492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="robots" content="noindex, nofollow">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#1a0a2e">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="My Calendar">
+<!-- Only what the calendar uses: its own voice files, the hub's Google scripts and the weather service. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; media-src 'self' blob: data:; connect-src 'self' https://script.google.com https://script.googleusercontent.com https://api.open-meteo.com https://geocoding-api.open-meteo.com; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'">
+<meta name="referrer" content="no-referrer">
+<link rel="manifest" href="calendar-manifest.json">
+<link rel="icon" href="calendar-icon.svg" type="image/svg+xml">
+<title>My Daily Calendar</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Andika:wght@400;700&family=Fredoka:wght@500;600;700&family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
+<style>
+/* Layout: the whole wooden board is a "camera" stage that fills the screen. A slim icon bar holds the
+   name tabs and a few small tools: a rail on the left in landscape, a strip on top in portrait. Tapping a
+   section zooms the camera onto it and slides in the magnet tray (right side in landscape, bottom sheet
+   in portrait). One deliberate look in every theme: bright toy board on Paul's night sky. Board internals
+   are drawn at a fixed 1200px design width and scaled. */
+:root {
+  color-scheme: dark;
+  --night: #1a0a2e;
+  --night-2: #2c1756;
+  --wood: #e9cf9f;
+  --wood-edge: #b98c55;
+  --blue: #2f72d6;
+  --green: #36a04c;
+  --red: #e0432f;
+  --yellow: #ffd23f;
+  --well: #fffdf7;
+  --surface: #f6f3ec;
+  --ink: #1d2340;
+  --ink-soft: #5b6079;
+  --star: #fff6d8;
+  --ok: #2e9c48;
+
+  --t-month: #2f9a49;
+  --t-day: #d9362b;
+  --t-num: #2b62c8;
+  --t-sky: #9bd6f7;
+  --t-sky-ink: #164a8a;
+
+  /* temperature bands, same as the hub's What to wear card */
+  --hot: #d93a2b;
+  --warm: #e08a00;
+  --cool: #16998a;
+  --cold: #2f6fd6;
+  --freezing: #6a4fd1;
+
+  --display: 'Fredoka', 'Nunito', ui-rounded, system-ui, sans-serif;
+  --read: 'Andika', 'Nunito', system-ui, sans-serif;
+  --ui: 'Nunito', system-ui, sans-serif;
+}
+
+* { box-sizing: border-box; }
+:root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body {
+  margin: 0; overflow: hidden;
+  background: radial-gradient(120% 70% at 50% -10%, var(--night-2), var(--night) 60%), var(--night);
+  color: var(--star);
+  font-family: var(--ui);
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none; user-select: none;
+}
+button { font: inherit; color: inherit; cursor: pointer; border: 0; background: none; padding: 0; }
+button:focus-visible, [role="button"]:focus-visible { outline: 3px solid var(--yellow); outline-offset: 3px; }
+
+.stars { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.stars i {
+  position: absolute; width: var(--s); height: var(--s); border-radius: 50%;
+  background: var(--star); opacity: var(--o);
+  animation: twinkle var(--d) ease-in-out infinite var(--dl);
+}
+@keyframes twinkle { 50% { opacity: calc(var(--o) * .25); } }
+
+.app { position: relative; height: 100%; overflow: hidden; }
+.stage {
+  position: absolute; inset: 0;
+  padding-block: 12px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.camera {
+  position: absolute; left: 0; top: 0; width: 1200px;
+  transform-origin: 0 0;
+  transition: transform .8s cubic-bezier(.65, .02, .25, 1);
+}
+.camera.instant { transition: none; }
+
+/* ── The board (design px) ── */
+.board {
+  --fs: 30px;
+  position: relative;
+  width: 1200px;
+  border-radius: 22px;
+  padding: 16px;
+  background:
+    repeating-linear-gradient(92deg, rgba(140, 90, 40, .07) 0 2px, transparent 2px 7px, rgba(140, 90, 40, .05) 7px 8px, transparent 8px 19px),
+    linear-gradient(180deg, #f1dcb4, var(--wood) 40%, #e2c290);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .45), inset 0 -4px 0 var(--wood-edge), 0 30px 70px rgba(0, 0, 0, .55);
+}
+.rivets { display: flex; justify-content: space-between; padding: 10px 24px 0; }
+.rivets span { display: flex; gap: 40px; }
+.rivets i {
+  width: 13px; height: 13px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #fff, #b9bec8 55%, #858b96);
+  box-shadow: 0 1px 1px rgba(0, 0, 0, .35);
+}
+.title-band {
+  border-radius: 8px 8px 0 0;
+  background: radial-gradient(circle at 11px 11px, rgba(255, 255, 255, .35) 3px, transparent 3.5px) 0 0 / 24px 24px, var(--yellow);
+  padding: 10px 16px 8px; text-align: center;
+}
+.title-band h1 { margin: 0; font: 700 60px/1 var(--display); text-transform: uppercase; letter-spacing: .01em; }
+.title-band h1 span { display: inline-block; -webkit-text-stroke: 2px #fff; paint-order: stroke fill; text-shadow: 0 3px 0 rgba(0, 0, 0, .18); }
+.title-band .w1 { color: var(--blue); }
+.title-band .w2 { color: var(--green); }
+.title-band .w3 { color: var(--red); }
+
+.panels { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.panel { padding: 26px 18px 24px; display: flex; flex-direction: column; gap: 32px; }
+.panel.blue { border-bottom-left-radius: 8px; }
+.panel.red { border-bottom-right-radius: 8px; }
+.panel.blue {
+  --p: var(--blue); --p-ink: #163f86;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='72' height='72'%3E%3Cg fill='%23fff' fill-opacity='.13'%3E%3Cpath d='M14 6l2.4 5 5.4.6-4 3.7 1.1 5.3L14 18l-4.9 2.6 1.1-5.3-4-3.7 5.4-.6z'/%3E%3Cpath d='M52 40a9 9 0 1 0 6 15 7 7 0 1 1-6-15z'/%3E%3Ccircle cx='60' cy='12' r='2.5'/%3E%3Ccircle cx='20' cy='56' r='3'/%3E%3C/g%3E%3C/svg%3E"), var(--blue);
+}
+.panel.green {
+  --p: var(--green); --p-ink: #1d6a2e;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='70' height='70'%3E%3Cg fill='%23fff' fill-opacity='.14'%3E%3Crect x='8' y='8' width='9' height='9' rx='1.5' transform='rotate(15 12 12)'/%3E%3Cpath d='M48 10l7 12H41z'/%3E%3Ccircle cx='22' cy='50' r='5'/%3E%3Crect x='50' y='46' width='12' height='5' rx='2.5'/%3E%3C/g%3E%3C/svg%3E"), var(--green);
+}
+.panel.red {
+  --p: var(--red); --p-ink: #9b2214;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64'%3E%3Cg fill='%23fff' fill-opacity='.14'%3E%3Cpath d='M16 22c-5-4-9-7-9-11a4.5 4.5 0 0 1 9-1 4.5 4.5 0 0 1 9 1c0 4-4 7-9 11z'/%3E%3Ccircle cx='48' cy='14' r='4'/%3E%3Ccircle cx='14' cy='48' r='2.5'/%3E%3Cpath d='M44 38l3 6 6 1-4.5 4 1 6.5L44 52l-5.5 3 1-6.5L35 45l6-1z'/%3E%3C/g%3E%3C/svg%3E"), var(--red);
+}
+
+/* sections (the white wells) */
+.sec {
+  position: relative;
+  background: var(--well);
+  border-radius: 14px;
+  padding: 28px 14px 16px;
+  box-shadow: inset 0 2px 5px rgba(20, 30, 60, .16), 0 0 0 3px color-mix(in srgb, var(--p) 55%, #fff);
+  transition: opacity .5s, filter .5s;
+  cursor: pointer;
+}
+.sec.stack { display: grid; gap: 30px; }
+.pair { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 18px; }
+.tab {
+  position: absolute; top: 0; left: 50%; transform: translate(-50%, -55%);
+  white-space: nowrap; z-index: 2;
+  background: var(--yellow); color: var(--p-ink);
+  font: 800 17px/1 var(--ui); letter-spacing: .08em; text-transform: uppercase;
+  padding: 6px 14px 5px; border-radius: 999px;
+  box-shadow: 0 0 0 2px var(--well), 0 0 0 4px color-mix(in srgb, var(--p) 55%, #fff);
+}
+.stack .sub { position: relative; }
+.stack .sub .tab { top: -14px; }
+
+/* needs updating: glowing ring, yesterday's magnets fade */
+.app[data-mode="overview"] .sec.stale {
+  box-shadow: inset 0 2px 5px rgba(20, 30, 60, .16), 0 0 0 4px var(--yellow), 0 0 0 10px rgba(255, 210, 63, .55), 0 0 34px 10px rgba(255, 220, 90, .55);
+  animation: needs 1.7s ease-in-out infinite;
+}
+@keyframes needs {
+  50% { box-shadow: inset 0 2px 5px rgba(20, 30, 60, .16), 0 0 0 4px var(--yellow), 0 0 0 18px rgba(255, 210, 63, .28), 0 0 50px 18px rgba(255, 220, 90, .4); }
+}
+.tile.old { opacity: .42; filter: saturate(.35); }
+.app[data-mode="zoom"] .sec:not(.focus) { opacity: .45; filter: saturate(.6); }
+
+.badge {
+  position: absolute; top: -20px; right: -14px; z-index: 3;
+  width: 48px; height: 48px; border-radius: 50%;
+  background: var(--ok); color: #fff; display: grid; place-items: center;
+  box-shadow: 0 0 0 4px #fff, 0 4px 10px rgba(0, 0, 0, .3);
+  opacity: 0; transform: scale(.4); transition: opacity .3s, transform .4s cubic-bezier(.3, 1.6, .5, 1);
+  pointer-events: none;
+}
+.badge svg { width: 28px; height: 28px; }
+.app[data-mode="overview"] .sec.fresh .badge { opacity: 1; transform: none; }
+.hand {
+  position: absolute; right: -44px; bottom: -62px; z-index: 1;
+  font-size: 78px; line-height: 1; pointer-events: none;
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, .35));
+  opacity: 0; transform-origin: 50% 0;
+}
+.app[data-mode="overview"] .sec.next .hand { opacity: 1; animation: tap 1.3s ease-in-out infinite; }
+@keyframes tap { 0%, 100% { transform: translate(0, 0) rotate(-18deg); } 45% { transform: translate(-8px, -16px) rotate(-18deg) scale(.96); } }
+
+/* slots */
+.slot { display: block; width: 100%; border-radius: 12px; position: relative; text-align: center; }
+.spot {
+  min-height: calc(var(--fs) * 2.1);
+  border-radius: 10px;
+  border: 3px dashed color-mix(in srgb, var(--p) 38%, #fff);
+  display: grid; place-items: center;
+  color: color-mix(in srgb, var(--p) 45%, #fff);
+  font: 700 var(--fs)/1 var(--display);
+}
+.slot.has .spot { border-color: transparent; }
+.slot.active .spot {
+  border-color: var(--p); color: var(--p);
+  background: color-mix(in srgb, var(--yellow) 22%, transparent);
+  animation: beckon 1.5s ease-in-out infinite;
+}
+@keyframes beckon { 50% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--yellow) 60%, transparent); } }
+
+.digits { display: flex; gap: 8px; justify-content: center; }
+.digits .cell {
+  width: calc(var(--fs) * 1.75); height: calc(var(--fs) * 2.05);
+  border-radius: 9px;
+  border: 3px dashed color-mix(in srgb, var(--p) 38%, #fff);
+  display: grid; place-items: center;
+}
+.digits .cell.filled { border-color: transparent; }
+.slot.active .digits .cell.next { border-color: var(--p); background: color-mix(in srgb, var(--yellow) 22%, transparent); animation: beckon 1.5s ease-in-out infinite; }
+.slot-date .spot, .slot-date.active .spot { border: 0; background: none; animation: none; min-height: 0; }
+
+/* magnets */
+.tile {
+  --c: #888; --on: #fff;
+  display: inline-flex; align-items: center; justify-content: center; gap: .35em;
+  width: 100%;
+  min-height: calc(var(--fs) * 2.05);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--c) 88%, #fff), var(--c) 45%);
+  color: var(--on);
+  font: 600 var(--fs)/1.05 var(--display);
+  text-transform: uppercase; letter-spacing: .02em; text-align: center;
+  padding: .3em .45em .25em;
+  border-radius: 9px;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, .22);
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, .3), 0 4px 0 color-mix(in srgb, var(--c) 60%, #000), 0 8px 12px rgba(10, 10, 30, .3);
+  transition: opacity .3s, filter .3s;
+}
+.tile .em { font-size: 1.05em; line-height: 1; text-shadow: none; }
+.tile.dark-ink { text-shadow: none; }
+.tile.num { width: 100%; height: 100%; min-height: 0; font-size: calc(var(--fs) * 1.25); padding: 0; }
+.tile.pic { flex-direction: column; gap: .15em; text-transform: none; font-size: calc(var(--fs) * .78); padding: .45em .3em .4em; }
+.tile.pic .em { font-size: 1.9em; }
+.tile.face { width: auto; min-height: 0; aspect-ratio: 1; padding: 0; border-radius: 50%; background: none; box-shadow: 0 4px 0 #c88f00, 0 9px 12px rgba(10, 10, 30, .3); }
+.tile.face svg { display: block; width: 100%; height: 100%; }
+.t-month { --c: var(--t-month); }
+.t-day { --c: var(--t-day); }
+.t-num { --c: var(--t-num); }
+.t-sky { --c: var(--t-sky); --on: var(--t-sky-ink); }
+.tile.landing { visibility: hidden; }
+.tile.snap { animation: snap .34s cubic-bezier(.3, 1.6, .5, 1); }
+@keyframes snap { 0% { transform: scale(1.08, .86); } 100% { transform: none; } }
+
+.slot-feel .spot { width: calc(var(--fs) * 4.2); height: calc(var(--fs) * 4.2); min-height: 0; margin: 0 auto; border-radius: 50%; }
+.slot-feel .tile.face { width: 100%; }
+.acts { display: grid; gap: 12px; width: 100%; }
+.acts .tile.pic { flex-direction: row; gap: .4em; font-size: calc(var(--fs) * .8); min-height: calc(var(--fs) * 2.05); }
+.acts .tile.pic .em { font-size: 1.35em; }
+.slot-activities .spot { min-height: calc(var(--fs) * 2.05 * 2 + 12px); padding: 0; }
+.slot-activities.has .spot { min-height: 0; }
+/* while zoomed, keep room for three magnets so the camera framing never changes */
+.app[data-mode="zoom"] .sec.focus .slot-activities .spot { min-height: calc(var(--fs) * 2.05 * 4 + 36px); align-items: start; }
+.ghost {
+  display: flex; align-items: center; justify-content: center; gap: .4em;
+  min-height: calc(var(--fs) * 2.05); border-radius: 9px;
+  border: 3px dashed color-mix(in srgb, var(--p) 45%, #fff);
+  color: color-mix(in srgb, var(--ink) 45%, #fff);
+  font: 600 calc(var(--fs) * .8)/1.05 var(--display);
+}
+.ghost .em { font-size: 1.35em; opacity: .55; filter: grayscale(.4); }
+.picks-head { grid-column: 1 / -1; font: 800 12px/1 var(--ui); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); padding-top: 4px; }
+.pick.planned .tile { box-shadow: inset 0 2px 0 rgba(255, 255, 255, .3), 0 4px 0 color-mix(in srgb, var(--c) 60%, #000), 0 0 0 3px var(--yellow), 0 8px 12px rgba(10, 10, 30, .3); }
+.countdown { margin-top: 12px; color: var(--ink); font: 700 19px/1.25 var(--ui); }
+.countdown .moons { display: block; font-size: 1.1em; letter-spacing: .05em; margin-top: 2px; }
+.countdown b { font-weight: 900; color: var(--p-ink); }
+
+/* thermometer */
+.thermo { display: grid; grid-template-columns: calc(var(--fs) * 1.7) calc(var(--fs) * 1.2) minmax(0, 1fr); --bulb: calc(var(--fs) * 1.6); border-radius: 10px; }
+.thermo .tube-wrap { position: relative; min-height: calc(var(--fs) * 10); }
+.tube {
+  position: absolute; left: 50%; top: 2px; bottom: calc(var(--bulb) * .6);
+  width: calc(var(--fs) * .78); transform: translateX(-50%);
+  background: #fff; border: 3px solid #cfd5e2; border-bottom: 0; border-radius: 99px 99px 0 0; overflow: hidden;
+}
+.mercury { position: absolute; left: 0; right: 0; bottom: 0; height: var(--fill, 0%); background: var(--tc, #bfe3fb); transition: height .7s cubic-bezier(.3, 1.35, .5, 1), background-color .4s; }
+.tube i { position: absolute; right: 0; width: 40%; height: 2px; background: rgba(29, 35, 64, .25); z-index: 1; }
+.bulb {
+  position: absolute; left: 50%; bottom: 0; width: var(--bulb); height: var(--bulb);
+  transform: translateX(-50%); border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, rgba(255, 255, 255, .55), transparent 45%), var(--tc, #bfe3fb);
+  border: 3px solid #cfd5e2; transition: background-color .4s;
+}
+.lane { position: relative; }
+.arrow {
+  position: absolute; left: 4px; right: 0; height: calc(var(--fs) * 1.05);
+  top: var(--ay, 50%); transform: translateY(-50%);
+  background: linear-gradient(180deg, #f25a45, #d63a26);
+  clip-path: polygon(0 50%, 42% 0, 42% 26%, 100% 26%, 100% 74%, 42% 74%, 42% 100%);
+  filter: drop-shadow(0 2px 0 #8f2416);
+  transition: top .6s cubic-bezier(.3, 1.35, .5, 1), opacity .3s;
+}
+.arrow.off { opacity: 0; }
+.slot-temp.stale .mercury, .slot-temp.stale .arrow:not(.off) { opacity: .4; }
+.levels { display: grid; grid-template-rows: repeat(5, minmax(0, 1fr)); padding-bottom: calc(var(--bulb) * .6); }
+.level {
+  display: grid; gap: 1px; text-align: left; max-width: 100%;
+  padding: 5px 12px; border-radius: 10px;
+  color: var(--lc); font: 700 28px/1.05 var(--display); text-transform: uppercase;
+  align-self: center; justify-self: start;
+}
+.level small { font: 700 19px/1 var(--ui); color: var(--ink-soft); text-transform: none; white-space: nowrap; }
+.level.on { background: var(--lc); color: #fff; box-shadow: 0 3px 0 color-mix(in srgb, var(--lc) 60%, #000); }
+.slot-temp.stale .level.on { opacity: .45; }
+.level.on small { color: rgba(255, 255, 255, .85); }
+.slot-temp.active .thermo { background: color-mix(in srgb, var(--yellow) 18%, transparent); box-shadow: 0 0 0 3px var(--yellow); }
+
+.round {
+  flex: none; width: 46px; height: 46px; border-radius: 50%;
+  display: grid; place-items: center;
+  background: #fff; color: var(--ink); box-shadow: 0 2px 0 #d9d4c7, 0 0 0 1.5px #e3ddcf;
+}
+.round svg { width: 22px; height: 22px; }
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  background: var(--yellow); color: var(--ink);
+  font: 800 16px/1 var(--ui);
+  padding: 13px 18px; border-radius: 999px;
+  box-shadow: 0 3px 0 #c79c00;
+}
+.btn:active { transform: translateY(2px); box-shadow: 0 1px 0 #c79c00; }
+.btn svg { width: 20px; height: 20px; }
+.btn.quiet { background: #fff; box-shadow: 0 2px 0 #d9d4c7, 0 0 0 1.5px #e3ddcf; }
+.btn.big { font-size: 19px; padding: 16px 22px; }
+.btn[disabled] { opacity: .45; pointer-events: none; }
+
+/* ── The icon bar: name tabs and small tools ── */
+.bar { position: absolute; z-index: 9; display: flex; align-items: center; gap: 8px; transition: opacity .3s, transform .3s; }
+.app[data-orient="port"] .bar {
+  top: 10px; left: max(12px, env(safe-area-inset-left, 0px)); right: max(12px, env(safe-area-inset-right, 0px));
+  flex-wrap: wrap;
+}
+.app[data-orient="land"] .bar {
+  top: 12px; bottom: 12px; left: max(10px, env(safe-area-inset-left, 0px)); width: 64px;
+  flex-direction: column;
+}
+.app[data-mode="zoom"] .bar { opacity: 0; pointer-events: none; }
+.app[data-orient="port"][data-mode="zoom"] .bar { transform: translateY(-10px); }
+.app[data-orient="land"][data-mode="zoom"] .bar { transform: translateX(-10px); }
+.kids { display: flex; gap: 6px; min-width: 0; min-height: 0; scrollbar-width: none; }
+.kids:empty { display: none; }
+.app[data-orient="port"] .kids { flex: 0 1 auto; overflow-x: auto; }
+.app[data-orient="land"] .kids { flex-direction: column; overflow-y: auto; }
+.tools { display: flex; align-items: center; gap: 6px; flex: none; }
+.app[data-orient="port"] .tools { margin-left: auto; }
+.app[data-orient="land"] .tools { flex-direction: column; margin-top: auto; }
+.kid-tab {
+  --kc: var(--blue);
+  flex: none; display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 12px 4px 4px; border-radius: 999px;
+  font: 700 15px/1 var(--display); color: var(--star);
+  background: rgba(255, 255, 255, .08); box-shadow: inset 0 0 0 2px rgba(255, 255, 255, .18);
+}
+.kid-tab .av { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-size: 21px; line-height: 1; background: rgba(255, 255, 255, .12); }
+.kid-tab .nm { max-width: 8em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kid-tab[aria-pressed="true"] { background: var(--kc); color: #fff; box-shadow: 0 3px 0 color-mix(in srgb, var(--kc) 60%, #000), 0 0 0 2px rgba(255, 255, 255, .85); }
+.app[data-orient="land"] .kid-tab { flex-direction: column; gap: 3px; width: 64px; padding: 5px 3px 6px; border-radius: 16px; font-size: 12px; }
+.app[data-orient="land"] .kid-tab .nm { max-width: 58px; }
+.tool {
+  flex: none; width: 42px; height: 42px; border-radius: 50%;
+  display: grid; place-items: center; position: relative;
+  color: var(--star); text-decoration: none;
+  background: rgba(255, 255, 255, .1); box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, .22);
+}
+.tool svg { width: 21px; height: 21px; }
+.tool:hover { background: rgba(255, 255, 255, .2); }
+.tool:focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
+/* everything is on the board: Read it back lights up */
+.tool.ready { background: var(--yellow); color: var(--ink); box-shadow: 0 3px 0 #c79c00; animation: ready 1.6s ease-in-out infinite; }
+@keyframes ready { 50% { box-shadow: 0 3px 0 #c79c00, 0 0 0 8px rgba(255, 210, 63, .3); } }
+.practice { font: 800 10px/1.1 var(--ui); letter-spacing: .04em; text-transform: uppercase; color: var(--night); background: var(--yellow); border-radius: 6px; padding: 4px 6px; text-align: center; }
+@media (max-width: 400px) {
+  .tool { width: 38px; height: 38px; }
+  .app[data-orient="port"] .kid-tab { padding: 3px; }
+  .app[data-orient="port"] .kid-tab .nm { display: none; }
+}
+@media (max-height: 420px) {
+  .tool { width: 36px; height: 36px; }
+  .tool svg { width: 19px; height: 19px; }
+  .app[data-orient="land"] .kid-tab .av { width: 30px; height: 30px; font-size: 19px; }
+}
+/* very short sideways phones: pictures only on the tabs, so both children and every tool fit */
+@media (max-height: 360px) {
+  .bar, .tools, .kids { gap: 5px; }
+  .tool { width: 34px; height: 34px; }
+  .app[data-orient="land"] .kid-tab { padding: 4px 3px; }
+  .app[data-orient="land"] .kid-tab .nm { display: none; }
+}
+
+/* ── Tomorrow ── */
+.ahead { --fs: clamp(16px, 4.6cqi, 26px); }
+.ah-grid { display: grid; gap: 18px; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); margin-top: 6px; }
+.ah-box { background: var(--surface); border-radius: 14px; padding: 14px; display: grid; gap: 10px; align-content: start; }
+.ah-label { font: 800 12px/1 var(--ui); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); }
+.ah-big { font: 600 22px/1.15 var(--display); color: var(--ink); }
+.ah-band { display: inline-flex; align-items: center; gap: 8px; font: 700 18px/1 var(--display); color: #fff; background: var(--tc); padding: 8px 12px; border-radius: 10px; justify-self: start; }
+.ah-wear { font-size: 30px; letter-spacing: 4px; }
+.ah-acts { display: grid; gap: 10px; }
+.ah-acts .tile.pic { flex-direction: row; gap: .4em; font-size: calc(var(--fs) * .8); min-height: calc(var(--fs) * 2.05); }
+.ah-acts .tile.pic .em { font-size: 1.35em; }
+.ah-note { font: 700 13px/1.35 var(--ui); color: var(--ink-soft); }
+.rb-foot { display: flex; justify-content: center; padding-top: 12px; }
+
+/* ── Grown-ups: children and routines ── */
+.kid-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid #ece6d8; }
+.kid-row input[type="text"] { font: 700 16px/1.2 var(--ui); padding: 9px 11px; border-radius: 10px; border: 1.5px solid #d9d3c4; background: #fff; color: var(--ink); width: 9em; min-width: 0; }
+.kid-row select { font-size: 20px; padding: 6px; border-radius: 10px; border: 1.5px solid #d9d3c4; background: #fff; }
+.chk { display: inline-flex; align-items: center; gap: 6px; font: 700 14px/1.2 var(--ui); color: var(--ink-soft); }
+.routine { display: grid; gap: 4px; }
+.kid-confirm { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 12px; margin: 6px 0; border-radius: 12px; background: #fdecea; font: 700 15px/1.3 var(--ui); color: #8a1f12; }
+.btn.danger { background: #d9362b; color: #fff; box-shadow: 0 3px 0 #8f2416; }
+.rt-row { display: grid; grid-template-columns: minmax(0, 9em) auto; align-items: center; gap: 4px 10px; padding: 6px 0; border-bottom: 1px solid #ece6d8; }
+.rt-name { font: 700 15px/1.2 var(--ui); color: var(--ink); }
+.rt-days { display: inline-flex; gap: 4px; flex-wrap: wrap; }
+.rt-day { width: 34px; height: 34px; border-radius: 50%; font: 800 13px/1 var(--ui); background: #fff; color: var(--ink); box-shadow: 0 0 0 1.5px #d9d3c4; }
+.rt-day[aria-pressed="true"] { background: var(--ink); color: #fff; box-shadow: none; }
+.rt-row .chk { grid-column: 2; }
+@media (max-width: 480px) { .rt-row { grid-template-columns: 1fr; } .rt-row .chk { grid-column: 1; } }
+
+/* ── Zoom chrome ── */
+.back {
+  position: absolute; z-index: 12;
+  top: 12px; left: max(16px, env(safe-area-inset-left, 0px));
+  display: inline-flex; align-items: center; gap: 8px;
+  background: rgba(255, 253, 247, .96); color: var(--ink);
+  font: 800 16px/1 var(--ui); padding: 12px 16px 12px 12px; border-radius: 999px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, .35);
+  opacity: 0; transform: translateY(-10px); pointer-events: none;
+  transition: opacity .3s, transform .3s;
+}
+.back svg { width: 22px; height: 22px; }
+.app[data-mode="zoom"] .back { opacity: 1; transform: none; pointer-events: auto; }
+
+.tray { position: absolute; z-index: 20; container-type: inline-size; transition: transform .5s cubic-bezier(.3, .9, .3, 1); }
+.app[data-orient="land"] .tray {
+  top: 0; right: 0; bottom: 0; width: clamp(300px, 34vw, 440px);
+  padding: 12px max(12px, env(safe-area-inset-right, 0px)) 12px 0;
+  transform: translateX(110%);
+}
+.app[data-orient="port"] .tray {
+  left: 0; right: 0; bottom: 0; height: min(54%, 600px);
+  padding: 0 max(8px, env(safe-area-inset-right, 0px)) 0 max(8px, env(safe-area-inset-left, 0px));
+  transform: translateY(110%);
+}
+.app[data-mode="zoom"] .tray { transform: none; }
+.tray .frame {
+  height: 100%;
+  background:
+    repeating-linear-gradient(92deg, rgba(140, 90, 40, .07) 0 2px, transparent 2px 7px, rgba(140, 90, 40, .05) 7px 8px, transparent 8px 19px),
+    linear-gradient(180deg, #f1dcb4, var(--wood) 40%, #e2c290);
+  border-radius: 18px; padding: 10px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .45), 0 18px 50px rgba(0, 0, 0, .55);
+  display: flex; flex-direction: column;
+  max-width: 760px; margin: 0 auto;
+}
+.app[data-orient="port"] .tray .frame { border-radius: 18px 18px 0 0; padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px)); }
+.surface {
+  flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+  background: var(--surface); border-radius: 8px; color: var(--ink);
+  padding: 16px 16px 18px;
+  box-shadow: inset 0 2px 6px rgba(20, 30, 60, .14);
+  display: flex; flex-direction: column; gap: 14px;
+  --fs: clamp(15px, 5.4cqi, 22px);
+}
+.eyebrow { font: 800 12px/1 var(--ui); letter-spacing: .12em; text-transform: uppercase; color: var(--ink-soft); }
+.ask { display: flex; align-items: center; gap: 10px; }
+.ask h2 { margin: 0; flex: 1; min-width: 0; font: 600 clamp(22px, 7cqi, 30px)/1.1 var(--display); text-wrap: balance; }
+/* fixed height, so the magnets below never move when feedback appears */
+.bubble {
+  flex: none;
+  font: 700 16px/1.3 var(--ui);
+  height: calc(3 * 1.3em + 18px); overflow: hidden;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3;
+  border-radius: 12px; padding: 9px 14px;
+  background: #fff; color: var(--ink-soft);
+  box-shadow: 0 0 0 1.5px #e3ddcf;
+}
+.bubble.good { background: #e3f6e6; box-shadow: 0 0 0 1.5px #a8dcb1; color: #165a28; }
+.bubble.try { background: #fff4d6; box-shadow: 0 0 0 1.5px #f2d27a; color: #6d4b00; }
+.picks { display: grid; grid-template-columns: repeat(var(--cols, 2), minmax(0, 1fr)); gap: 14px 12px; padding-bottom: 4px; }
+.picks.flow { grid-auto-flow: column; grid-template-rows: repeat(var(--rows), auto); }
+.pick { display: grid; grid-template-rows: 1fr; justify-items: center; gap: 6px; border-radius: 12px; transition: opacity .2s; }
+.pick.span-all { grid-column: 1 / -1; }
+.pick .tile.face { align-self: center; width: 74%; }
+.pick:active .tile { transform: translateY(2px); }
+.pick .cap { font: 800 13px/1 var(--ui); color: var(--ink-soft); }
+.pick.digit .tile { height: calc(var(--fs) * 2.4); }
+.pick.nope { opacity: .38; }
+.pick.wiggle { animation: wiggle .45s ease; }
+@keyframes wiggle { 20% { transform: rotate(-7deg); } 40% { transform: rotate(6deg); } 60% { transform: rotate(-4deg); } 80% { transform: rotate(2deg); } }
+.pick.glow .tile { outline: 4px solid var(--yellow); outline-offset: 3px; animation: glow 1s ease-in-out infinite; }
+@keyframes glow { 50% { outline-color: #fff2a8; transform: translateY(-3px); } }
+.pick.chosen .tile { outline: 4px solid var(--ink); outline-offset: 3px; }
+.pick.level-pick .tile { flex-direction: column; gap: 4px; }
+.picks .tile.pic { font-size: calc(var(--fs) * .72); }
+.picks .tile.pic .em { font-size: 1.7em; }
+.pick.level-pick .tile small { font: 700 .62em/1 var(--ui); text-transform: none; opacity: .9; }
+.foot {
+  display: flex; justify-content: center; gap: 10px; flex-wrap: wrap;
+  position: sticky; bottom: -18px; z-index: 2;
+  margin: -6px -16px -18px; padding: 12px 16px 16px;
+  background: linear-gradient(rgba(246, 243, 236, 0), var(--surface) 14px);
+}
+.foot:empty { display: none; }
+
+/* ── Overlays: read it back, grown-ups ── */
+.overlay {
+  position: absolute; inset: 0; z-index: 40;
+  background: rgba(10, 4, 24, .62);
+  display: grid; place-items: center;
+  padding-block: 16px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.card {
+  width: min(100%, 760px); max-height: 100%; overflow-y: auto;
+  background: #fffef9; color: var(--ink);
+  border-radius: 16px; padding: 18px 20px 20px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, .55);
+  position: relative;
+  container-type: inline-size;
+  -webkit-user-select: text; user-select: text;
+}
+.card-head {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  position: sticky; top: -18px; z-index: 1;
+  margin: -18px -20px 8px; padding: 18px 20px 8px; background: #fffef9;
+}
+.strip .card-head { margin-left: -13px; padding-left: 13px; }
+.card-head h2 { margin: 0; flex: 1; font: 600 26px/1.1 var(--display); }
+.card.strip { background: repeating-linear-gradient(180deg, var(--red) 0 22px, var(--blue) 22px 44px, var(--green) 44px 66px) 0 0 / 7px 100% no-repeat, #fffef9; }
+.lines { display: grid; }
+.line {
+  --lh: 2.3em;
+  display: block; width: 100%; text-align: left;
+  font: 400 clamp(19px, 3.6cqi, 28px)/var(--lh) var(--read);
+  color: var(--ink); border-radius: 6px; padding: 0 6px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='100' viewBox='0 0 24 100' preserveAspectRatio='none'%3E%3Cline x1='0' y1='20' x2='24' y2='20' stroke='%23b8c9ea' stroke-width='1.5' vector-effect='non-scaling-stroke'/%3E%3Cline x1='0' y1='41.5' x2='13' y2='41.5' stroke='%23cfd7ea' stroke-width='1.5' vector-effect='non-scaling-stroke'/%3E%3Cline x1='0' y1='63' x2='24' y2='63' stroke='%23e4867b' stroke-width='2' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E") 0 0 / 24px var(--lh) repeat;
+  transition: background-color .2s;
+}
+.line .w { font-weight: 700; color: var(--wc, var(--ink)); }
+.line .blank { display: inline-block; width: 2.8em; height: .95em; vertical-align: -.08em; background: #eceff7; border-radius: 4px 4px 0 0; border-bottom: 3px solid #9aa3bd; }
+.line.reading { background-color: color-mix(in srgb, var(--yellow) 38%, transparent); }
+.line:hover { background-color: color-mix(in srgb, var(--yellow) 14%, transparent); }
+
+.gp { display: grid; gap: 16px; }
+.gp p { margin: 0; font: 600 15px/1.45 var(--ui); color: var(--ink-soft); }
+.gp h3 { margin: 0 0 8px; font: 800 13px/1 var(--ui); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); }
+.seg { display: inline-flex; flex-wrap: wrap; gap: 6px; }
+.seg button {
+  font: 800 15px/1 var(--ui); padding: 11px 15px; border-radius: 999px;
+  background: #fff; color: var(--ink); box-shadow: 0 0 0 1.5px #d9d3c4;
+}
+.seg button[aria-pressed="true"] { background: var(--ink); color: #fff; box-shadow: none; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+select#dv { font: 700 15px/1.2 var(--ui); padding: 10px 12px; border-radius: 10px; border: 1.5px solid #d9d3c4; background: #fff; color: var(--ink); max-width: 100%; min-width: 0; }
+
+.flyer { position: fixed; z-index: 50; pointer-events: none; margin: 0; }
+canvas.confetti { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 60; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+</style>
+</head>
+<body>
+<div class="app" id="app" data-mode="overview" data-orient="land">
+  <div class="stars" id="stars" aria-hidden="true"></div>
+
+  <div class="stage" id="stage">
+    <div class="camera" id="camera">
+      <section class="board" id="board" aria-label="My Daily Calendar board">
+        <header class="title-band"><h1><span class="w1">My</span> <span class="w2">Daily</span> <span class="w3">Calendar</span></h1></header>
+        <div class="panels">
+          <div class="panel blue">
+            <div class="sec" data-sec="month">
+              <span class="tab">Month</span>
+              <div class="slot" data-slot="month"></div>
+            </div>
+            <div class="pair">
+              <div class="sec" data-sec="date">
+                <span class="tab">Date</span>
+                <div class="slot slot-date" data-slot="date"></div>
+              </div>
+              <div class="sec" data-sec="year">
+                <span class="tab">Year</span>
+                <div class="slot" data-slot="year"></div>
+              </div>
+            </div>
+            <div class="sec stack" data-sec="days">
+              <div class="sub"><span class="tab">Yesterday was</span><div class="slot" data-slot="yesterday"></div></div>
+              <div class="sub"><span class="tab">Today is</span><div class="slot" data-slot="today"></div></div>
+              <div class="sub"><span class="tab">Tomorrow will be</span><div class="slot" data-slot="tomorrow"></div></div>
+            </div>
+          </div>
+          <div class="panel green">
+            <div class="sec" data-sec="season">
+              <span class="tab">Season</span>
+              <div class="slot" data-slot="season"></div>
+            </div>
+            <div class="sec" data-sec="temp">
+              <span class="tab">Temperature</span>
+              <div class="slot slot-temp" data-slot="temp">
+                <div class="thermo">
+                  <div class="tube-wrap" aria-hidden="true">
+                    <div class="tube"><div class="mercury" id="mercury"></div><i style="top:10%"></i><i style="top:30%"></i><i style="top:50%"></i><i style="top:70%"></i><i style="top:90%"></i></div>
+                    <div class="bulb"></div>
+                  </div>
+                  <div class="lane" aria-hidden="true"><div class="arrow off" id="arrow"></div></div>
+                  <div class="levels" id="levels"></div>
+                </div>
+              </div>
+            </div>
+            <div class="sec" data-sec="weather">
+              <span class="tab">Weather</span>
+              <div class="slot" data-slot="weather"></div>
+            </div>
+          </div>
+          <div class="panel red">
+            <div class="sec" data-sec="activities">
+              <span class="tab">Activities</span>
+              <div class="slot slot-activities" data-slot="activities"></div>
+            </div>
+            <div class="sec" data-sec="holiday">
+              <span class="tab">Holiday</span>
+              <div class="slot" data-slot="holiday"></div>
+            </div>
+            <div class="sec" data-sec="feel">
+              <span class="tab">I feel</span>
+              <div class="slot slot-feel" data-slot="feel"></div>
+            </div>
+          </div>
+        </div>
+        <div class="rivets" aria-hidden="true"><span><i></i><i></i></span><span><i></i><i></i></span></div>
+      </section>
+    </div>
+  </div>
+
+  <header class="bar" id="bar">
+    <nav class="kids" id="kids" aria-label="Whose calendar"></nav>
+    <div class="tools" id="tools" role="toolbar" aria-label="Calendar tools"></div>
+  </header>
+
+  <button class="back" id="back" type="button">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M7.5 10.5h6M15.5 15.5L20 20"/></svg>
+    Whole board
+  </button>
+
+  <aside class="tray" id="tray" aria-label="Magnets">
+    <div class="frame"><div class="surface" id="surface"></div></div>
+  </aside>
+
+  <div class="overlay" id="readback" hidden>
+    <div class="card strip" role="dialog" aria-modal="true" aria-labelledby="rb-title">
+      <div class="card-head">
+        <h2 id="rb-title">Read it back</h2>
+        <button class="btn" id="read-all" type="button"></button>
+        <button class="round" id="rb-close" type="button" aria-label="Close"></button>
+      </div>
+      <div class="lines" id="lines"></div>
+      <div class="rb-foot"><button class="btn quiet" type="button" id="rb-ahead"></button></div>
+    </div>
+  </div>
+
+  <div class="overlay" id="ahead" hidden>
+    <div class="card ahead" role="dialog" aria-modal="true" aria-labelledby="ah-title">
+      <div class="card-head">
+        <h2 id="ah-title">Tomorrow</h2>
+        <button class="btn" id="ah-read" type="button"></button>
+        <button class="round" id="ah-close" type="button" aria-label="Close"></button>
+      </div>
+      <div id="ah-body"></div>
+    </div>
+  </div>
+
+  <div class="overlay" id="grownups" hidden>
+    <div class="card" role="dialog" aria-modal="true" aria-labelledby="gp-title">
+      <div class="card-head">
+        <h2 id="gp-title">Grown-ups</h2>
+        <button class="round" id="gp-close" type="button" aria-label="Close"></button>
+      </div>
+      <div class="gp" id="gp"></div>
+    </div>
+  </div>
+</div>
+<div class="sr" aria-live="polite" id="live"></div>
+
+<script>
+(() => {
+  'use strict';
+
+  /* CATALOG-START: words, pictures and every spoken phrase. The voice files are recorded from this list. */
+  const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const SEASONS = {
+    spring: { name: 'Spring', em: '🌷', c: '#58b947', hint: 'Flowers are starting to bloom.' },
+    summer: { name: 'Summer', em: '🌻', c: '#e5452d', hint: 'It is the hottest time of the year.' },
+    autumn: { name: 'Autumn', em: '🍂', c: '#ef8a1f', hint: 'The leaves are changing color and falling down.' },
+    winter: { name: 'Winter', em: '❄️', c: '#2c8fd9', hint: 'It is the coldest time of the year.' }
+  };
+  /* Same bands and words as the hub's What to wear card */
+  const TEMPS = [
+    { id: 'hot', name: 'Hot', range: '80°+', c: 'var(--hot)', adv: 'Wear shorts and a hat, and drink lots of water.' },
+    { id: 'warm', name: 'Warm', range: '65–79°', c: 'var(--warm)', adv: 'A T-shirt is just right.' },
+    { id: 'cool', name: 'Cool', range: '50–64°', c: 'var(--cool)', adv: 'Bring a light jacket.' },
+    { id: 'cold', name: 'Cold', range: '33–49°', c: 'var(--cold)', adv: 'Wear your coat and long pants.' },
+    { id: 'freezing', name: 'Freezing', range: '32° or less', c: 'var(--freezing)', adv: 'Wear your big coat, a scarf and gloves.' }
+  ];
+  const WEATHER = [
+    { id: 'sunny', name: 'Sunny', em: '☀️' },
+    { id: 'partly', name: 'Partly cloudy', em: '⛅' },
+    { id: 'cloudy', name: 'Cloudy', em: '☁️' },
+    { id: 'rainy', name: 'Rainy', em: '🌧️' },
+    { id: 'stormy', name: 'Stormy', em: '⛈️' },
+    { id: 'snowy', name: 'Snowy', em: '🌨️' },
+    { id: 'windy', name: 'Windy', em: '💨' },
+    { id: 'foggy', name: 'Foggy', em: '🌫️' }
+  ];
+  const ACTIVITIES = [
+    { id: 'school', name: 'School', em: '🏫', c: '#2b62c8' },
+    { id: 'home', name: 'Home day', em: '🏠', c: '#7a52c7' },
+    { id: 'virtual', name: 'School at home', em: '💻', c: '#1f7fb8' },
+    { id: 'aba', name: 'ABA', say: 'A-B-A', em: '🧑‍🏫', c: '#0f8b8d' },
+    { id: 'therapy', name: 'Therapy', em: '🗣️', c: '#8a5cc7' },
+    { id: 'gym', name: 'Gym', em: '🤸', c: '#e2672f' },
+    { id: 'park', name: 'Park', em: '🛝', c: '#3a9d4a' },
+    { id: 'playdate', name: 'Play date', em: '🧸', c: '#d9822b' },
+    { id: 'music', name: 'Music lesson', em: '🎵', c: '#1f8fb8' },
+    { id: 'sports', name: 'Sports practice', em: '⚽', c: '#4f8a2b' },
+    { id: 'library', name: 'Library', em: '📚', c: '#a8432f' },
+    { id: 'doctor', name: 'Doctor visit', em: '🩺', c: '#2f8f8a' },
+    { id: 'birthday', name: 'Birthday', em: '🎂', c: '#d63f7f' },
+    { id: 'party', name: 'Party', em: '🎈', c: '#e2432f' },
+    { id: 'vacation', name: 'Vacation', em: '🏖️', c: '#e0a100' },
+    { id: 'special', name: 'Special activity', em: '⭐', c: '#c43c3c' }
+  ];
+  const FEELINGS = [
+    { id: 'happy', name: 'Happy' }, { id: 'excited', name: 'Excited' }, { id: 'silly', name: 'Silly' }, { id: 'calm', name: 'Calm' },
+    { id: 'tired', name: 'Tired' }, { id: 'sad', name: 'Sad' }, { id: 'worried', name: 'Worried' }, { id: 'angry', name: 'Angry' }
+  ];
+  const BIG_FEELINGS = {
+    sad: 'It is okay to feel sad. A hug can help.',
+    worried: 'It is okay to feel worried. You can tell a grown-up.',
+    angry: 'It is okay to feel angry. Let’s take a big breath together.',
+    tired: 'Maybe a quiet minute will help.'
+  };
+  const HOLS = {
+    newyear: { name: 'New Year’s Day', em: '🎉', c: '#6a3fc1' },
+    mlk: { name: 'Martin Luther King Jr. Day', say: 'Martin Luther King Junior Day', em: '🕊️', c: '#2b62c8' },
+    groundhog: { name: 'Groundhog Day', em: '🐿️', c: '#7a8a2b' },
+    valentine: { name: 'Valentine’s Day', em: '❤️', c: '#d63f7f' },
+    presidents: { name: 'Presidents’ Day', em: '🎩', c: '#2b4fa8' },
+    stpatrick: { name: 'St. Patrick’s Day', say: 'Saint Patrick’s Day', em: '☘️', c: '#2e8b3a' },
+    aprilfools: { name: 'April Fools’ Day', em: '🤪', c: '#e0a100' },
+    easter: { name: 'Easter', em: '🐣', c: '#3fa7c9' },
+    mother: { name: 'Mother’s Day', em: '💐', c: '#d6457f' },
+    memorial: { name: 'Memorial Day', em: '🎖️', c: '#2b4fa8' },
+    father: { name: 'Father’s Day', em: '👔', c: '#2f6fd6' },
+    july4: { name: 'Fourth of July', the: true, em: '🎆', c: '#c8322a' },
+    labor: { name: 'Labor Day', em: '🛠️', c: '#d9822b' },
+    columbus: { name: 'Columbus Day', em: '⛵', c: '#1f8fb8' },
+    halloween: { name: 'Halloween', em: '🎃', c: '#e86a10' },
+    veterans: { name: 'Veterans Day', em: '🎗️', c: '#2b4fa8' },
+    thanks: { name: 'Thanksgiving', em: '🦃', c: '#a8582f' },
+    chanukah: { name: 'Chanukah', say: 'Hanukkah', em: '🕎', c: '#2f6fd6' },
+    christmas: { name: 'Christmas', em: '🎄', c: '#2e8b3a' }
+  };
+  const SECTIONS = [
+    { id: 'month', name: 'Month', slots: ['month'], panel: 'blue', call: 'the month' },
+    { id: 'date', name: 'Date', slots: ['date'], panel: 'blue', call: 'the date' },
+    { id: 'year', name: 'Year', slots: ['year'], panel: 'blue', call: 'the year' },
+    { id: 'days', name: 'Days', slots: ['yesterday', 'today', 'tomorrow'], panel: 'blue', call: 'the days of the week' },
+    { id: 'season', name: 'Season', slots: ['season'], panel: 'green', call: 'the season' },
+    { id: 'temp', name: 'Temperature', slots: ['temp'], panel: 'green', call: 'the thermometer' },
+    { id: 'weather', name: 'Weather', slots: ['weather'], panel: 'green', call: 'the weather' },
+    { id: 'activities', name: 'Activities', slots: ['activities'], panel: 'red', call: 'activities' },
+    { id: 'holiday', name: 'Holiday', slots: ['holiday'], panel: 'red', call: 'the holiday' },
+    { id: 'feel', name: 'I feel', slots: ['feel'], panel: 'red', call: 'how you feel' }
+  ];
+  const ASKS = {
+    month: ['What month is it?'], date: ['What is the date today?'], year: ['What year is it?'],
+    yesterday: ['What day was yesterday?'], today: ['What day is it today?'], tomorrow: ['What day will tomorrow be?'],
+    season: ['What season is it?'], temp: ['Is it hot or cold outside?', 'Step outside and feel the air.'],
+    weather: ['What is the weather like?', 'Look out the window!'], activities: ['What are you doing today?', 'Pick up to four.'],
+    holiday: ['Is today a holiday?'], feel: ['How do you feel today?']
+  };
+  const MAX_ACTS = 4;
+  const YEARS = Array.from({ length: 17 }, (_, i) => 2024 + i);
+  const MAX_SLEEPS = 75;
+
+  const ONES = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen'];
+  const TENS = ['', '', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety'];
+  const numWord = n => n < 20 ? ONES[n] : TENS[Math.floor(n / 10)] + (n % 10 ? '-' + ONES[n % 10] : '');
+  const ORD = { one: 'first', two: 'second', three: 'third', five: 'fifth', eight: 'eighth', nine: 'ninth', twelve: 'twelfth' };
+  const ordWord = n => {
+    const parts = numWord(n).split('-'); const last = parts.pop();
+    return [...parts, ORD[last] || (last.endsWith('y') ? last.slice(0, -1) + 'ieth' : last + 'th')].join('-');
+  };
+  const ordinal = n => n + ((n % 100 >= 11 && n % 100 <= 13) ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' }[n % 10] || 'th'));
+  const yearWord = y => numWord(Math.floor(y / 100)) + ' ' + (y % 100 === 0 ? 'hundred' : y % 100 < 10 ? 'oh ' + numWord(y % 100) : numWord(y % 100));
+
+  function buildCatalog() {
+    const C = {};
+    const add = (id, text, tts) => { C[id] = tts && tts !== text ? { text, tts } : { text }; };
+    Object.entries(ASKS).forEach(([k, a]) => add('ask.' + k, a.join(' ')));
+    MONTHS.forEach((m, i) => { add('month.is.' + i, `The month is ${m}.`); add('month.last.' + i, `Last month was ${m}.`); });
+    add('month.next', 'What month comes next?');
+    for (let d = 1; d <= 31; d++) add('date.is.' + d, `Today is the ${ordinal(d)}.`, `Today is the ${ordWord(d)}.`);
+    for (let d = 1; d <= 30; d++) add('date.yest.' + d, `Yesterday was the ${ordinal(d)}.`, `Yesterday was the ${ordWord(d)}.`);
+    add('date.next', 'What number comes next?');
+    add('date.first', 'It is the very first day of the month!');
+    add('date.more', 'Good! Now the next number.');
+    YEARS.forEach(y => { add('year.is.' + y, `The year is ${y}.`, `The year is ${yearWord(y)}.`); add('year.last.' + y, `Last year was ${y}.`, `Last year was ${yearWord(y)}.`); });
+    add('year.next', 'What year comes next?');
+    DAYS.forEach((d, i) => {
+      add('day.yest.' + i, `Yesterday was ${d}.`);
+      add('day.today.' + i, `Today is ${d}.`);
+      add('day.tom.' + i, `Tomorrow will be ${d}.`);
+      add('day.before.' + i, `What day comes before ${d}?`);
+      add('day.after.' + i, `What day comes after ${d}?`);
+    });
+    add('day.next', 'What day comes next?');
+    Object.entries(SEASONS).forEach(([k, s]) => { add('season.is.' + k, `It is ${s.name.toLowerCase()}.`); add('season.hint.' + k, s.hint); });
+    TEMPS.forEach(t => {
+      add('temp.short.' + t.id, `It is ${t.name.toLowerCase()} outside.`);
+      add('temp.long.' + t.id, `It is ${t.name.toLowerCase()} outside${t.id === 'hot' ? '!' : '.'} ${t.adv}`);
+    });
+    WEATHER.forEach(w => add('weather.' + w.id, `It is ${w.name.toLowerCase()} today.`));
+    ACTIVITIES.forEach(a => {
+      const n = a.id === 'aba' ? a.name : a.name.toLowerCase(), say = a.say;
+      add('act.' + a.id, `${a.name}!`, say && `${say}!`);
+      /* read-back list: "Today's plans: school, park and library." recorded as list pieces */
+      add('plan.one.' + a.id, `Today’s plans: ${n}.`, say && `Today’s plans: ${say}.`);
+      add('plan.item.' + a.id, `${n},`, say && `${say},`);
+      add('plan.last.' + a.id, `and ${n}.`, say && `and ${say}.`);
+      add('tplan.one.' + a.id, `Tomorrow’s plans: ${n}.`, say && `Tomorrow’s plans: ${say}.`);
+    });
+    add('tmr.plans', 'Tomorrow’s plans:');
+    add('tmr.nothing', 'Nothing special tomorrow.');
+    add('tmr.chilly', 'It will be chilly in the morning, so bring a jacket.');
+    add('ask.plan', 'Let’s put today’s plan on the board!');
+    add('gen.planall', 'That’s the whole plan. Great job!');
+    add('gen.tomorrow', 'Let’s look at tomorrow!');
+    WEATHER.forEach(w => {
+      add('fc.wx.' + w.id, `The weather report says it will be ${w.name.toLowerCase()} today.`);
+      add('tmr.wx.' + w.id, `It will be ${w.name.toLowerCase()}.`);
+    });
+    TEMPS.forEach(t => {
+      add('fc.temp.' + t.id, `The weather report says it will be ${t.name.toLowerCase()} today.`);
+      add('tmr.temp.' + t.id, `It will be ${t.name.toLowerCase()}${t.id === 'hot' ? '!' : '.'} ${t.adv}`);
+    });
+    FEELINGS.forEach(f => {
+      add('feel.short.' + f.id, `I feel ${f.name.toLowerCase()}.`);
+      if (BIG_FEELINGS[f.id]) add('feel.long.' + f.id, `I feel ${f.name.toLowerCase()}. ${BIG_FEELINGS[f.id]}`);
+    });
+    Object.entries(HOLS).forEach(([k, h]) => {
+      const the = h.the ? 'the ' : '', said = h.say && the + h.say;
+      add('hol.today.' + k, `Today is ${the}${h.name}!`, said && `Today is ${said}!`);
+      add('hol.next.' + k, `The next holiday is ${the}${h.name}.`, said && `The next holiday is ${said}.`);
+    });
+    for (let n = 1; n <= MAX_SLEEPS; n++) add('sleeps.' + n, n === 1 ? 'Just one more sleep!' : `${n} more sleeps!`, n === 1 ? null : `${numWord(n)} more sleeps!`);
+    add('hol.none', 'No holiday today.');
+    add('hol.hint.yes', 'Today is a special day! Which one is it?');
+    add('hol.hint.no', 'Let’s see. Is there a party or a parade today?');
+    add('hol.notyet', 'Not yet! That one is still coming.');
+    add('hol.past', 'That one already happened.');
+    add('gen.goodtry', 'Good try!');
+    add('gen.tryagain', 'Try again!');
+    add('gen.glow', 'Find the one that’s glowing!');
+    add('gen.full', 'Your board is full. Tap one to take it off.');
+    add('gen.plans', 'Today’s plans:');
+    add('gen.nothing', 'Nothing special today. That’s okay!');
+    add('gen.done', 'You did it! Your calendar is all ready.');
+    add('gen.morning', 'Good morning! Tap a glowing spot to update your calendar.');
+    add('gen.start', 'Let’s fill in your calendar! Tap a glowing spot to start.');
+    add('gen.right', 'That one is already right!');
+    add('gen.readfirst', 'Fill in the board first, then I can read it to you.');
+    add('gen.finishline', 'Fill in the board to finish this sentence.');
+    add('gen.try', 'Hi! This is how I sound.');
+    SECTIONS.forEach(s => add('next.' + s.id, `Next, tap ${s.call}!`));
+    return C;
+  }
+  /* CATALOG-END */
+
+  const CAT = buildCatalog();
+  const SEC = Object.fromEntries(SECTIONS.map(s => [s.id, s]));
+  const SLOT_IDS = SECTIONS.flatMap(s => s.slots);
+  const SLOT_SEC = Object.fromEntries(SECTIONS.flatMap(s => s.slots.map(x => [x, s.id])));
+
+  /* ── Dates ── */
+  const pad = n => String(n).padStart(2, '0');
+  const dayNum = d => Math.round(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 864e5);
+  function seasonOf(m, d) {
+    const md = (m + 1) * 100 + d;
+    if (md >= 1221 || md < 320) return 'winter';
+    if (md < 621) return 'spring';
+    if (md < 922) return 'summer';
+    return 'autumn';
+  }
+  function nth(y, m, wd, n) {
+    if (n > 0) { const first = new Date(y, m, 1).getDay(); return new Date(y, m, 1 + ((wd - first + 7) % 7) + 7 * (n - 1)); }
+    const last = new Date(y, m + 1, 0);
+    return new Date(y, m, last.getDate() - ((last.getDay() - wd + 7) % 7));
+  }
+  function easter(y) {
+    const a = y % 19, b = Math.floor(y / 100), c = y % 100, d = Math.floor(b / 4), e = b % 4,
+      f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3), h = (19 * a + b - d - g + 15) % 30,
+      i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7, mm = Math.floor((a + 11 * h + 22 * l) / 451),
+      month = Math.floor((h + l - 7 * mm + 114) / 31), day = ((h + l - 7 * mm + 114) % 31) + 1;
+    return new Date(y, month - 1, day);
+  }
+  /* Chanukah's first day is 25 Kislev, so it moves with the Hebrew calendar (Reingold & Dershowitz) */
+  const hebElapsed = y => {
+    const m = Math.floor((235 * y - 234) / 19), parts = 12084 + 13753 * m;
+    let d = m * 29 + Math.floor(parts / 25920);
+    if ((3 * (d + 1)) % 7 < 3) d++;
+    return d;
+  };
+  const hebNewYear = y => {
+    const a = hebElapsed(y - 1), b = hebElapsed(y), c = hebElapsed(y + 1);
+    return -1373427 + b + (c - b === 356 ? 2 : b - a === 382 ? 1 : 0);
+  };
+  function chanukah(gy) {
+    const H = gy + 3761, len = hebNewYear(H + 1) - hebNewYear(H);
+    const rd = hebNewYear(H) + 30 + (len % 10 === 5 ? 30 : 29) + 24;
+    const u = new Date((rd - 719163) * 864e5);
+    return new Date(u.getUTCFullYear(), u.getUTCMonth(), u.getUTCDate());
+  }
+  function holidaysFor(y) {
+    const H = (key, date, days = 1) => ({ id: key + y, key, ...HOLS[key], start: dayNum(date), days });
+    const list = [
+      H('newyear', new Date(y, 0, 1)), H('mlk', nth(y, 0, 1, 3)), H('groundhog', new Date(y, 1, 2)),
+      H('valentine', new Date(y, 1, 14)), H('presidents', nth(y, 1, 1, 3)), H('stpatrick', new Date(y, 2, 17)),
+      H('easter', easter(y)), H('aprilfools', new Date(y, 3, 1)), H('mother', nth(y, 4, 0, 2)),
+      H('memorial', nth(y, 4, 1, -1)), H('father', nth(y, 5, 0, 3)), H('july4', new Date(y, 6, 4)),
+      H('labor', nth(y, 8, 1, 1)), H('columbus', nth(y, 9, 1, 2)), H('halloween', new Date(y, 9, 31)),
+      H('veterans', new Date(y, 10, 11)), H('thanks', nth(y, 10, 4, 4)), H('chanukah', chanukah(y), 8),
+      H('christmas', new Date(y, 11, 25))
+    ];
+    return list.sort((a, b) => a.start - b.start);
+  }
+  function todayInfo(d) {
+    const y = d.getFullYear(), m = d.getMonth(), dd = d.getDate(), wd = d.getDay(), n = dayNum(d);
+    const hols = [...holidaysFor(y - 1), ...holidaysFor(y), ...holidaysFor(y + 1)];
+    /* two holidays can share a day (Christmas during Chanukah); either answer is right */
+    const todaysAll = hols.filter(h => n >= h.start && n < h.start + h.days).sort((a, b) => a.days - b.days);
+    const todays = todaysAll[0] || null;
+    const upcoming = hols.filter(h => h.start > n);
+    const past = hols.filter(h => h.start + h.days <= n);
+    return { y, m, d: dd, wd, n, key: `${y}-${pad(m + 1)}-${pad(dd)}`, season: seasonOf(m, dd), todays, todaysAll, next: upcoming[0] || null, upcoming, lastPast: past[past.length - 1] || null };
+  }
+  let dayOffset = 0;
+  const shifted = add => { const d = new Date(); d.setHours(12, 0, 0, 0); d.setDate(d.getDate() + dayOffset + add); return d; };
+  const keyOf = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  let T = todayInfo(shifted(0));
+  const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+  /* ── The Family Hub's data on this device: same site, same browser storage.
+     Calendar events and the forecast come from there; nothing here needs its own keys. ── */
+  const readLS = k => { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } };
+  const writeLS = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
+  const HUB = { cfg: readLS('hub.cfg'), data: readLS('hub.data') || {}, wx: readLS('hub.wx') };
+  const hubMembers = () => (HUB.cfg && Array.isArray(HUB.cfg.members) ? HUB.cfg.members : [])
+    .filter(m => m && typeof m.id === 'string' && /^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(m.url || '') && m.key);
+  const hubZip = () => (HUB.cfg && typeof HUB.cfg.zip === 'string' ? HUB.cfg.zip.trim() : '');
+  /* Nothing from the hub on this device yet: show a sample forecast, clearly marked, like the hub's own sample data */
+  const sampleMode = () => !hubMembers().length && !hubZip();
+
+  async function refreshWeather() {
+    const zip = hubZip();
+    if (!zip || (HUB.wx && HUB.wx.zip === zip && Date.now() - HUB.wx.ts < 30 * 60e3)) return false;
+    try {
+      let geo = readLS('hub.geo');
+      if (!geo || geo.zip !== zip) {
+        const r = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(zip)}&count=1&countryCode=US&language=en`);
+        const loc = ((await r.json()).results || [])[0];
+        if (!loc) return false;
+        geo = { zip, lat: loc.latitude, lon: loc.longitude };
+        writeLS('hub.geo', geo);
+      }
+      const r = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${geo.lat}&longitude=${geo.lon}&current=temperature_2m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min&temperature_unit=fahrenheit&timezone=auto&forecast_days=5`);
+      const j = await r.json();
+      /* the same shape the hub saves, so both pages share one cache */
+      HUB.wx = { zip, ts: Date.now(), now: { t: Math.round(j.current.temperature_2m), c: j.current.weather_code },
+        days: j.daily.time.map((t, i) => ({ t, c: j.daily.weather_code[i], hi: Math.round(j.daily.temperature_2m_max[i]), lo: Math.round(j.daily.temperature_2m_min[i]) })) };
+      writeLS('hub.wx', HUB.wx);
+      return true;
+    } catch (e) { return false; }
+  }
+  async function refreshCalendar() {
+    const ms = hubMembers();
+    const stale = m => { const d = HUB.data[m.id]; return !d || Date.now() - Math.max(d.at || 0, d.calAt || 0) > 30 * 60e3; };
+    if (!ms.some(stale)) return false;
+    let got = false;
+    await Promise.all(ms.filter(stale).map(async m => {
+      try {
+        const u = new URL(m.url);
+        u.searchParams.set('key', m.key); u.searchParams.set('parts', 'calendar');
+        const j = await (await fetch(u, { cache: 'no-store' })).json();
+        if (j && Array.isArray(j.calendar)) { HUB.data[m.id] = { ...(HUB.data[m.id] || {}), calendar: j.calendar, calAt: Date.now() }; got = true; }
+      } catch (e) {}
+    }));
+    if (got) {
+      const all = readLS('hub.data') || {};
+      ms.forEach(m => { if (HUB.data[m.id] && HUB.data[m.id].calAt) all[m.id] = { ...(all[m.id] || {}), calendar: HUB.data[m.id].calendar, calAt: HUB.data[m.id].calAt }; });
+      writeLS('hub.data', all);
+    }
+    return got;
+  }
+  function hubEventsOn(key) {
+    const seen = new Set(), out = [];
+    const end = keyOf(new Date(+key.slice(0, 4), +key.slice(5, 7) - 1, +key.slice(8, 10) + 1));
+    const s = new Date(key + 'T00:00:00').getTime(), e = new Date(end + 'T00:00:00').getTime();
+    for (const m of hubMembers()) for (const ev of ((HUB.data[m.id] || {}).calendar || [])) {
+      if (!ev || typeof ev.title !== 'string') continue;
+      const k = ev.id + '|' + ev.start;
+      if (seen.has(k)) continue;
+      const on = ev.allDay ? ev.start <= key && key < ev.end : new Date(ev.start).getTime() < e && new Date(ev.end).getTime() > s;
+      if (on) { seen.add(k); out.push(ev); }
+    }
+    return out.sort((a, b) => String(a.start).localeCompare(String(b.start)));
+  }
+  /* School day or home day: the same rules as Paul's view on the hub */
+  const SCHOOL_CAL = /\baps\b|school/i;
+  const fromSchool = e => SCHOOL_CAL.test(e.calendar || '') || /^🏫/.test(e.title);
+  const hasSchoolCal = () => hubMembers().some(m => ((HUB.data[m.id] || {}).calendar || []).some(e => e && typeof e.title === 'string' && fromSchool(e)));
+  const SCHOOL_HOLIDAYS = ['newyear', 'mlk', 'memorial', 'july4', 'labor', 'thanks', 'christmas'];
+  function dayKind(day) {
+    const evs = hubEventsOn(keyOf(day));
+    if (evs.some(e => /\bno school\b|\bhome day\b|\bschools? (are )?closed\b/i.test(e.title) || (fromSchool(e) && /\b(break|holiday|closed)\b/i.test(e.title)))) return 'home';
+    if (evs.some(e => fromSchool(e) && /\bvirtual\b/i.test(e.title))) return 'virtual';
+    if (day.getDay() === 0 || day.getDay() === 6) return 'home';
+    if (!hasSchoolCal() && todayInfo(day).todaysAll.some(h => SCHOOL_HOLIDAYS.includes(h.key))) return 'home';
+    return 'school';
+  }
+
+  /* Forecast for a day (0 = today), from the hub's weather or the sample */
+  const wxId = c => c === 0 ? 'sunny' : c <= 2 ? 'partly' : c === 3 ? 'cloudy' : c <= 48 ? 'foggy'
+    : (c >= 71 && c <= 77) || c === 85 || c === 86 ? 'snowy' : c >= 95 ? 'stormy' : c >= 51 ? 'rainy' : 'cloudy';
+  const tempId = hi => hi <= 32 ? 'freezing' : hi <= 49 ? 'cold' : hi <= 64 ? 'cool' : hi <= 79 ? 'warm' : 'hot';
+  const WEAR = { hot: '👕🩳🧢', warm: '👕', cool: '👕🧥', cold: '🧥👖', freezing: '🧥🧣🧤' };
+  function forecast(add) {
+    const key = keyOf(shifted(add));
+    let src = HUB.wx && HUB.wx.zip === hubZip() && hubZip() ? HUB.wx : null, sample = false;
+    if (!src && sampleMode()) {
+      const codes = [2, 0, 61, 3, 1, 0, 2], his = [64, 71, 58, 55, 67, 74, 62], los = [48, 53, 47, 44, 50, 55, 46];
+      src = { days: codes.map((c, i) => ({ t: keyOf(shifted(i)), c, hi: his[i], lo: los[i] })) }; sample = true;
+    }
+    const d = src && Array.isArray(src.days) && src.days.find(x => x.t === key);
+    if (!d) return null;
+    const temp = tempId(d.hi), weather = wxId(d.c);
+    const chilly = d.lo < 50 && d.hi > 49;
+    const wear = WEAR[temp] + (chilly && !WEAR[temp].includes('🧥') ? '🧥' : '') + (weather === 'rainy' || weather === 'stormy' ? '☔' : '') + (weather === 'snowy' ? '🥾' : '');
+    return { hi: d.hi, lo: d.lo, temp, weather, wear, chilly, sample };
+  }
+
+  /* ── Children: each has a name tab, a board and a weekly routine ── */
+  const KIDS_KEY = 'my-daily-calendar:kids';
+  const boardKey = id => 'my-daily-calendar:board:' + id;
+  const AVATARS = ['🚀', '🦋', '🦖', '🌈', '🐶', '🐱', '⚽', '🦄', '🐢', '🌟'];
+  const KID_COLORS = ['#2f72d6', '#d6457f', '#36a04c', '#7a52c7'];
+  const ROUTINE_ACTS = () => ACTIVITIES.filter(a => !['school', 'home', 'virtual'].includes(a.id));
+  function defaultKids() {
+    const first = HUB.cfg && typeof HUB.cfg.kidName === 'string' && HUB.cfg.kidName.trim() ? HUB.cfg.kidName.trim() : 'Paul';
+    return [
+      { id: 'k1', name: first, avatar: '🚀', color: KID_COLORS[0], school: true, example: true, routine: { aba: { days: [1, 2, 3, 4, 5], schoolOnly: false }, gym: { days: [2, 4], schoolOnly: true } } },
+      { id: 'k2', name: 'Ellie', avatar: '🦋', color: KID_COLORS[1], school: true, example: true, routine: { library: { days: [3], schoolOnly: true } } }
+    ];
+  }
+  const cleanName = v => String(v || '').replace(/[<>&"'`]/g, '').trim().slice(0, 20);
+  function cleanKids(raw) {
+    if (!Array.isArray(raw)) return null;
+    const out = [];
+    raw.slice(0, 4).forEach((k, i) => {
+      if (!k || typeof k !== 'object') return;
+      let id = typeof k.id === 'string' && /^[\w-]{1,24}$/.test(k.id) ? k.id : 'k' + (i + 1);
+      for (let n = 2; out.some(x => x.id === id); n++) id = 'k' + (i + 1) + '-' + n;   /* stable, so the board is found again */
+      const routine = {};
+      if (k.routine && typeof k.routine === 'object') for (const a of ROUTINE_ACTS()) {
+        const r = k.routine[a.id];
+        if (!r || !Array.isArray(r.days)) continue;
+        const days = [...new Set(r.days.filter(d => Number.isInteger(d) && d >= 0 && d <= 6))].sort();
+        if (days.length) routine[a.id] = { days, schoolOnly: r.schoolOnly === true };
+      }
+      out.push({ id, name: cleanName(k.name) || 'Kid ' + (i + 1), avatar: AVATARS.includes(k.avatar) ? k.avatar : AVATARS[i % AVATARS.length],
+        color: KID_COLORS.includes(k.color) ? k.color : KID_COLORS[i % KID_COLORS.length], school: k.school !== false, example: k.example === true, routine });
+    });
+    return out.length ? out : null;
+  }
+
+  /* Today's plan: school or home day, the weekly routine, and calendar events that name the child */
+  const EVENT_ACTS = [
+    ['aba', /\baba\b|\bbcba\b|\brbt\b|behavior therapy/i],
+    ['therapy', /\b(ot|pt|slp)\b|occupational|physical therapy|speech|therap(y|ist)/i],
+    ['doctor', /doctor|dentist|pediatric|check-?up|well[- ]?(visit|check)|\bshots?\b|vaccin|\bdr\.?\s/i],
+    ['gym', /\bgym\b|physical education/i],
+    ['gym', /\bP\.?E\b/],
+    ['library', /librar/i],
+    ['birthday', /birthday|🎂/i],
+    ['party', /\bparty\b/i],
+    ['playdate', /play ?date/i],
+    ['special', /field trip|field day|recital|picture day|show and tell|performance/i],
+    ['music', /\bmusic\b|piano|guitar|violin|drums?\b|choir|singing/i],
+    ['sports', /soccer|baseball|t-?ball|basketball|football|swim|gymnastics|karate|dance|hockey|tennis|practice/i],
+    ['park', /\bpark\b|playground/i],
+    ['vacation', /vacation|disney|\btrip\b|beach/i]
+  ];
+  const nameRe = name => new RegExp(`(^|[^\\p{L}])${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:['’]s)?(?=$|[^\\p{L}])`, 'iu');
+  const NOT = /\b(no|not|cancel+ed|canceled|closed|skip(ped)?)\b/i;
+  const NO_KIDS = /\b(no|without)\s+(kids|children)\b|kids?[- ]free|adults? only/i;
+  function planFor(add, k) {
+    const day = shifted(add), out = [], drop = new Set(), hits = [];
+    const push = (id, why) => { if (out.length < MAX_ACTS && !drop.has(id) && ACTIVITIES.some(a => a.id === id) && !out.some(x => x.id === id)) out.push({ id, why }); };
+    const kind = dayKind(day);
+    const me = nameRe(k.name), everyone = /\b(kids|children|everyone|family)\b/i;
+    const evs = hubEventsOn(keyOf(day)).filter(ev => !NO_KIDS.test(ev.title));
+    for (const ev of [...evs.filter(ev => me.test(ev.title)), ...evs.filter(ev => !me.test(ev.title) && everyone.test(ev.title))]) {
+      const hit = EVENT_ACTS.find(([, re]) => re.test(ev.title));
+      if (!hit) continue;
+      /* "Paul – no ABA today" takes ABA off the plan, routine included */
+      if (NOT.test(ev.title.replace(/\bno school\b/ig, ''))) drop.add(hit[0]); else hits.push([hit[0], ev.title]);
+    }
+    if (k.school) push(kind === 'home' ? 'home' : kind === 'virtual' ? 'virtual' : 'school', kind === 'home' ? 'Home day' : kind === 'virtual' ? 'School at home' : 'School day');
+    hits.forEach(([id, why]) => push(id, why));
+    /* example routines only show in the sample; at home they wait until a grown-up sets them */
+    if (!k.example || sampleMode()) for (const a of ROUTINE_ACTS()) {
+      const r = k.routine[a.id];
+      if (r && r.days.includes(day.getDay()) && !(r.schoolOnly && kind !== 'school')) push(a.id, 'Weekly routine');
+    }
+    return out;
+  }
+
+  /* ── Saved board ── */
+  const OLD_KEY = 'my-daily-calendar:v2';
+  const PREFS = 'my-daily-calendar:prefs:v2';
+  let prefs = { voice: 'natural', sound: true, deviceVoice: '', kid: '' };
+  let state, kids, kid;
+  const emptyState = () => ({ board: {}, setOn: {}, celebrated: null, sample: false });
+  function sampleState() {
+    /* Yesterday's finished board, so the first visit looks like a normal morning */
+    const Y = todayInfo(shifted(-1));
+    return {
+      board: {
+        month: Y.m, date: String(Y.d), year: Y.y, yesterday: (Y.wd + 6) % 7, today: Y.wd, tomorrow: (Y.wd + 1) % 7,
+        season: Y.season, temp: 'cool', weather: 'cloudy', activities: [Y.wd === 0 || Y.wd === 6 ? 'home' : 'school'],
+        holiday: Y.todays ? Y.todays.id : 'none', feel: 'happy'
+      },
+      setOn: { temp: Y.key, weather: Y.key, activities: Y.key, feel: Y.key },
+      celebrated: Y.key, sample: true
+    };
+  }
+  function load() {
+    try { const p = JSON.parse(localStorage.getItem(PREFS)); if (p) prefs = { ...prefs, ...p }; } catch (e) {}
+    const stored = readLS(KIDS_KEY);
+    kids = cleanKids(stored) || defaultKids();
+    if (JSON.stringify(stored) !== JSON.stringify(kids)) saveKids();
+    /* the board from before there were tabs belongs to the first child */
+    const old = readLS(OLD_KEY);
+    if (old) { if (!readLS(boardKey(kids[0].id))) writeLS(boardKey(kids[0].id), old); try { localStorage.removeItem(OLD_KEY); } catch (e) {} }
+    kid = kids.find(k => k.id === prefs.kid) || kids[0];
+    state = loadBoard(kid.id);
+  }
+  function loadBoard(id) {
+    const s = readLS(boardKey(id));
+    return s && typeof s === 'object' && s.board ? clean(s) : sampleState();
+  }
+  const saveKids = () => writeLS(KIDS_KEY, kids);
+  function clean(s) {
+    const obj = x => x && typeof x === 'object' && !Array.isArray(x) ? x : {};
+    const int = (v, lo, hi) => Number.isInteger(v) && v >= lo && v <= hi;
+    const b = obj(s.board), on = obj(s.setOn), out = {}, setOn = {};
+    if (int(b.month, 0, 11)) out.month = b.month;
+    if (typeof b.date === 'string' && /^\d{1,2}$/.test(b.date)) out.date = b.date;
+    if (int(b.year, 1900, 2999)) out.year = b.year;
+    ['yesterday', 'today', 'tomorrow'].forEach(k => { if (int(b[k], 0, 6)) out[k] = b[k]; });
+    if (SEASONS[b.season]) out.season = b.season;
+    if (TEMPS.some(t => t.id === b.temp)) out.temp = b.temp;
+    if (WEATHER.some(w => w.id === b.weather)) out.weather = b.weather;
+    if (Array.isArray(b.activities)) out.activities = [...new Set(b.activities.filter(a => ACTIVITIES.some(x => x.id === a)))].slice(0, MAX_ACTS);
+    if (b.holiday === 'none' || (typeof b.holiday === 'string' && HOLS[holKey(b.holiday)])) out.holiday = b.holiday;
+    if (FEELINGS.some(f => f.id === b.feel)) out.feel = b.feel;
+    ['temp', 'weather', 'activities', 'feel'].forEach(k => { if (typeof on[k] === 'string') setOn[k] = on[k]; });
+    return { board: out, setOn, celebrated: typeof s.celebrated === 'string' ? s.celebrated : null, sample: s.sample === true };
+  }
+  /* practice mode ("Pretend it's tomorrow") works on a copy that is never saved */
+  const save = () => { if (dayOffset) return; try { localStorage.setItem(boardKey(kid.id), JSON.stringify(state)); } catch (e) {} };
+  const savePrefs = () => { try { localStorage.setItem(PREFS, JSON.stringify(prefs)); } catch (e) {} };
+
+  /* ── Slots ── */
+  const dateDone = v => v === String(T.d) || (T.d < 10 && v === '0' + T.d);
+  function holidayChoices() {
+    const set = [];
+    if (T.lastPast && T.n - (T.lastPast.start + T.lastPast.days) < 21) set.push(T.lastPast);
+    set.push(...T.todaysAll);
+    for (const h of T.upcoming) { if (set.length >= 4) break; set.push(h); }
+    return set;
+  }
+  const sleepsTo = h => h.start - T.n;
+  const holKey = v => String(v).replace(/\d{4}$/, '');
+  const dayOptions = () => DAYS.map((n, i) => ({ v: i, html: tile(n, 't-day'), label: n }));
+
+  const SLOTS = {
+    month: {
+      kind: 'fact', label: 'Month', cols: 2, rows: 6,
+      options: () => MONTHS.map((n, i) => ({ v: i, html: tile(n, 't-month'), label: n })),
+      answer: () => T.m, confirm: v => ['month.is.' + v],
+      hint: () => ['gen.goodtry', 'month.last.' + ((T.m + 11) % 12), 'month.next']
+    },
+    date: {
+      kind: 'digits', label: 'Date', cols: 5,
+      options: () => '1234567890'.split('').map(n => ({ v: n, html: tile(n, 't-num num'), label: n, cls: 'digit' })),
+      answer: () => String(T.d), confirm: () => ['date.is.' + T.d],
+      hint: () => T.d === 1 ? ['gen.goodtry', 'date.first'] : ['gen.goodtry', 'date.yest.' + (T.d - 1), 'date.next']
+    },
+    year: {
+      kind: 'fact', label: 'Year', cols: 2,
+      options: () => [T.y - 1, T.y, T.y + 1, T.y + 2].map(y => ({ v: y, html: tile(String(y), 't-num'), label: String(y) })),
+      answer: () => T.y, confirm: v => ['year.is.' + v],
+      hint: () => ['gen.goodtry', 'year.last.' + (T.y - 1), 'year.next']
+    },
+    yesterday: {
+      kind: 'fact', label: 'Yesterday was', cols: 2, rows: 4, options: dayOptions,
+      answer: () => (T.wd + 6) % 7, confirm: v => ['day.yest.' + v],
+      hint: () => ['gen.goodtry', 'day.today.' + T.wd, 'day.before.' + T.wd]
+    },
+    today: {
+      kind: 'fact', label: 'Today is', cols: 2, rows: 4, options: dayOptions,
+      answer: () => T.wd, confirm: v => ['day.today.' + v],
+      hint: () => ['gen.goodtry', 'day.yest.' + ((T.wd + 6) % 7), 'day.next']
+    },
+    tomorrow: {
+      kind: 'fact', label: 'Tomorrow will be', cols: 2, rows: 4, options: dayOptions,
+      answer: () => (T.wd + 1) % 7, confirm: v => ['day.tom.' + v],
+      hint: () => ['gen.goodtry', 'day.today.' + T.wd, 'day.after.' + T.wd]
+    },
+    season: {
+      kind: 'fact', label: 'Season', cols: 2,
+      options: () => Object.entries(SEASONS).map(([id, s]) => ({ v: id, html: tile(s.name, '', s.c, s.em), label: s.name })),
+      answer: () => T.season, confirm: v => ['season.is.' + v],
+      hint: () => ['gen.goodtry', 'season.hint.' + T.season]
+    },
+    temp: {
+      kind: 'free', label: 'Temperature', cols: 1,
+      options: () => TEMPS.map(t => ({ v: t.id, html: tile(`${t.name}<small>${t.range}</small>`, '', t.c), label: t.name, cls: 'level-pick' })),
+      confirm: v => ['temp.long.' + v]
+    },
+    weather: {
+      kind: 'free', label: 'Weather', cols: 2,
+      options: () => WEATHER.map(w => ({ v: w.id, html: tile(w.name, 't-sky dark-ink', null, w.em), label: w.name })),
+      confirm: v => ['weather.' + v]
+    },
+    activities: {
+      kind: 'multi', label: 'Activities', cols: 3,
+      options: () => {
+        const plan = todayPlan().map(p => p.id);
+        const opt = (a, cls) => ({ v: a.id, html: picTile(a.name, a.em, a.c), label: a.name, cls });
+        if (!plan.length) return ACTIVITIES.map(a => opt(a));
+        return [{ heading: 'Today’s plan' }, ...plan.map(id => opt(ACTIVITIES.find(a => a.id === id), 'planned')),
+          { heading: 'More' }, ...ACTIVITIES.filter(a => !plan.includes(a.id)).map(a => opt(a))];
+      },
+      confirm: v => ['act.' + v]
+    },
+    holiday: {
+      kind: 'fact', label: 'Holiday', cols: 2,
+      options: () => [{ v: 'none', html: tile('No holiday', '', '#7b8299'), label: 'No holiday today', cls: 'span-all' },
+        ...holidayChoices().map(h => ({ v: h.id, html: picTile(h.name, h.em, h.c), label: h.name }))],
+      answer: () => T.todays ? T.todays.id : 'none',
+      accepts: v => v === 'none' ? !T.todays : T.todaysAll.some(h => h.id === v),
+      confirm: v => v === 'none'
+        ? ['hol.none', ...(T.next && sleepsTo(T.next) <= MAX_SLEEPS ? ['hol.next.' + T.next.key, 'sleeps.' + sleepsTo(T.next)] : [])]
+        : ['hol.today.' + holKey(v)],
+      reveal: () => T.todays ? ['hol.today.' + T.todays.key, 'gen.glow'] : ['hol.none', 'gen.glow'],
+      hint: () => ['gen.goodtry', T.todays ? 'hol.hint.yes' : 'hol.hint.no'],
+      wrong: v => {
+        if (v === 'none') return ['gen.goodtry', 'hol.hint.yes'];
+        const h = holidayChoices().find(x => x.id === v);
+        if (!h) return ['gen.goodtry', 'gen.tryagain'];
+        return [h.start > T.n ? 'hol.notyet' : 'hol.past', 'gen.tryagain'];
+      }
+    },
+    feel: {
+      kind: 'free', label: 'I feel', cols: 4,
+      options: () => FEELINGS.map(f => ({ v: f.id, html: `<span class="tile face">${face(f.id)}</span>`, label: f.name, cap: f.name })),
+      confirm: v => [BIG_FEELINGS[v] ? 'feel.long.' + v : 'feel.short.' + v]
+    }
+  };
+  const isRight = (id, v) => SLOTS[id].accepts ? SLOTS[id].accepts(v) : String(v) === String(SLOTS[id].answer());
+  const todayPlan = () => planFor(0, kid);
+  /* "Today's plans: school, gym and ABA." from the list-shaped recordings */
+  function planIds(list, when = 'today') {
+    if (!list.length) return [when === 'today' ? 'gen.nothing' : 'tmr.nothing'];
+    if (list.length === 1) return [(when === 'today' ? 'plan.one.' : 'tplan.one.') + list[0]];
+    return [when === 'today' ? 'gen.plans' : 'tmr.plans', ...list.slice(0, -1).map(id => 'plan.item.' + id), 'plan.last.' + list[list.length - 1]];
+  }
+  function askLines(slot) {
+    const lines = [{ ids: ['ask.' + slot] }];
+    if (slot === 'activities') {
+      const plan = todayPlan().map(p => p.id);
+      if (plan.length) return [{ ids: ['ask.plan'] }, { ids: planIds(plan), gap: .07 }];
+    }
+    const f = forecast(0);
+    if (f && !f.sample && slot === 'temp') lines.push({ ids: ['fc.temp.' + f.temp] });
+    if (f && !f.sample && slot === 'weather') lines.push({ ids: ['fc.wx.' + f.weather] });
+    return lines;
+  }
+  const sayAsk = slot => sayLines(askLines(slot));
+  const revealIds = id => SLOTS[id].reveal ? SLOTS[id].reveal() : [...SLOTS[id].confirm(SLOTS[id].answer()), 'gen.glow'];
+
+  function slotFresh(id) {
+    const S = SLOTS[id], v = state.board[id];
+    if (S.kind === 'fact') return v !== undefined && v !== null && isRight(id, v);
+    if (S.kind === 'digits') return !!v && dateDone(v);
+    if (S.kind === 'multi') return state.setOn[id] === T.key && Array.isArray(v);
+    return state.setOn[id] === T.key && v !== undefined && v !== null;
+  }
+  const secFresh = s => SEC[s].slots.every(slotFresh);
+  const staleSecs = () => SECTIONS.filter(s => !secFresh(s.id)).map(s => s.id);
+  const firstStaleSlot = s => SEC[s].slots.find(x => !slotFresh(x)) || null;
+
+  /* ── Markup helpers ── */
+  function tile(text, cls = '', color = null, em = null) {
+    const style = color ? ` style="--c:${color}"` : '';
+    return `<span class="tile ${cls}"${style}>${text}${em ? `<span class="em" aria-hidden="true">${em}</span>` : ''}</span>`;
+  }
+  function picTile(text, em, color, cls = '') {
+    return `<span class="tile pic ${cls}" style="--c:${color}"><span class="em" aria-hidden="true">${em}</span>${text}</span>`;
+  }
+  function face(kind) {
+    const dot = (x, y, r = 5.5) => `<circle cx="${x}" cy="${y}" r="${r}" fill="#3b2a12" stroke="none"/>`;
+    const eyes = dot(35, 42) + dot(65, 42);
+    const P = {
+      happy: eyes + '<path d="M29 59 Q50 82 71 59"/>',
+      excited: dot(35, 40, 6.5) + dot(65, 40, 6.5) + '<path d="M29 56 H71 Q71 80 50 80 Q29 80 29 56Z" fill="#7d2b17"/><path d="M40 72 Q50 66 60 72 Q56 80 50 80 Q44 80 40 72Z" fill="#ff7d93" stroke="none"/>',
+      silly: dot(35, 42) + '<path d="M58 42 H72"/><path d="M29 60 Q50 76 71 60"/><path d="M47 66 Q46 82 56 82 Q65 82 63 65" fill="#ff7d93"/>',
+      calm: '<path d="M27 44 Q35 37 43 44 M57 44 Q65 37 73 44"/><path d="M36 64 Q50 73 64 64"/>',
+      tired: '<path d="M27 43 Q35 49 43 43 M57 43 Q65 49 73 43"/><ellipse cx="50" cy="68" rx="6" ry="7.5" fill="#7d2b17"/><path d="M71 15 H81 L71 26 H81" stroke-width="3.5"/>',
+      sad: eyes + '<path d="M32 73 Q50 57 68 73"/><path d="M67 50 Q61 59 65 63 Q71 66 72 59 Q72 55 67 50Z" fill="#5cb8ff" stroke="none"/>',
+      worried: '<path d="M26 33 Q34 27 43 32 M57 32 Q66 27 74 33"/>' + dot(35, 45) + dot(65, 45) + '<path d="M31 70 Q37 64 43 70 T55 70 T67 70"/>',
+      angry: '<path d="M25 31 L43 38 M75 31 L57 38"/>' + dot(35, 46) + dot(65, 46) + '<path d="M31 72 L37 66 L43 72 L49 66 L55 72 L61 66 L67 72"/>'
+    };
+    return `<svg viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="46" fill="#ffd02f" stroke="#e8ad00" stroke-width="3"/><circle cx="36" cy="30" r="14" fill="#fff" fill-opacity=".22"/><g fill="none" stroke="#3b2a12" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">${P[kind]}</g></svg>`;
+  }
+  const ICON = {
+    speaker: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16.5 8.5a5 5 0 0 1 0 7"/><path d="M19 6a8.5 8.5 0 0 1 0 12"/></svg>',
+    close: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+    check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+    gear: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>'
+  };
+  ICON.home = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11.5L12 4l9 7.5"/><path d="M5.5 10v10h4.5v-6h4v6h4.5V10"/></svg>';
+  ICON.book = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 5h6a4 4 0 0 1 4 4v12a3 3 0 0 0-3-3H2z"/><path d="M22 5h-6a4 4 0 0 0-4 4v12a3 3 0 0 1 3-3h7z"/></svg>';
+  ICON.moon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg>';
+
+  /* ── Elements ── */
+  const $ = s => document.querySelector(s);
+  const app = $('#app'), stage = $('#stage'), camera = $('#camera'), board = $('#board'), bar = $('#bar'), tools = $('#tools');
+  const tray = $('#tray'), surface = $('#surface'), back = $('#back'), live = $('#live');
+  const rb = $('#readback'), rbLines = $('#lines'), gpOverlay = $('#grownups'), gp = $('#gp');
+  const kidsBar = $('#kids'), ahOverlay = $('#ahead'), ahBody = $('#ah-body');
+  const secEl = id => board.querySelector(`[data-sec="${id}"]`);
+  const slotEl = id => board.querySelector(`[data-slot="${id}"]`);
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+  const reduce = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  SECTIONS.forEach(s => {
+    const el = secEl(s.id);
+    el.insertAdjacentHTML('beforeend', `<span class="badge" aria-hidden="true">${ICON.check}</span><span class="hand" aria-hidden="true">👆</span>`);
+  });
+  $('#rb-close').innerHTML = ICON.close;
+  $('#gp-close').innerHTML = ICON.close;
+  $('#read-all').innerHTML = ICON.speaker + ' Read it all';
+  $('#ah-read').innerHTML = ICON.speaker + ' Read it';
+  $('#ah-close').innerHTML = ICON.close;
+  $('#rb-ahead').innerHTML = ICON.moon + ' What about tomorrow?';
+
+  /* ── What's on screen right now ── */
+  /* busy: the camera or a magnet is moving. lock: this slot is answered and the next step is on its way. */
+  const run = { mode: 'overview', sec: null, slot: null, entry: '', misses: {}, wrong: {}, busy: false, lock: null, prompted: false, token: 0 };
+  let feedback = { text: '', tone: '' };
+
+  /* ── Rendering the board ── */
+  function placedHTML(id, v, cls) {
+    switch (id) {
+      case 'month': return tile(MONTHS[v], 't-month ' + cls);
+      case 'year': return tile(String(v), 't-num ' + cls);
+      case 'yesterday': case 'today': case 'tomorrow': return tile(DAYS[v], 't-day ' + cls);
+      case 'season': { const s = SEASONS[v]; return s ? tile(s.name, cls, s.c, s.em) : ''; }
+      case 'weather': { const w = WEATHER.find(x => x.id === v); return w ? tile(w.name, 't-sky dark-ink ' + cls, null, w.em) : ''; }
+      case 'feel': return `<span class="tile face ${cls}">${face(v)}</span>`;
+      case 'holiday': {
+        if (v === 'none') return tile('No holiday', cls, '#7b8299') + (!cls.includes('old') && T.next ? countdownHTML(T.next) : '');
+        const h = HOLS[holKey(v)];
+        if (!h) return '';
+        return picTile(h.name, h.em, h.c, cls) + (!cls.includes('old') ? '<div class="countdown"><b>Today!</b></div>' : '');
+      }
+    }
+    return '';
+  }
+  function countdownHTML(h) {
+    const s = sleepsTo(h);
+    const moons = s <= 10 ? `<span class="moons" aria-hidden="true">${'🌙'.repeat(s)}</span>` : '';
+    return `<div class="countdown">${h.em} ${h.name} in <b>${s} ${s === 1 ? 'sleep' : 'sleeps'}</b>${moons}</div>`;
+  }
+  function slotLabel(id) {
+    const v = state.board[id];
+    if (v === undefined || v === null) return 'empty';
+    if (id === 'activities') return v.length ? v.map(a => (ACTIVITIES.find(x => x.id === a) || {}).name).join(', ') : 'nothing special';
+    if (id === 'date') return v;
+    const o = SLOTS[id].options().find(x => !x.heading && String(x.v) === String(v));
+    return o ? o.label : String(v);
+  }
+
+  function renderSlot(id, opts = {}) {
+    const el = slotEl(id), b = state.board;
+    const fresh = slotFresh(id);
+    const focus = run.mode === 'zoom' && run.sec === SLOT_SEC[id];
+    const active = focus && run.slot === id;
+    el.classList.toggle('active', active);
+    el.classList.toggle('stale', !fresh);
+    el.classList.add('slot-' + id);
+    el.tabIndex = focus ? 0 : -1;
+    el.setAttribute('role', focus ? 'button' : 'presentation');
+    const landing = opts.landing === id ? ' landing' : '';
+
+    if (id === 'temp') { renderThermo(fresh, focus); return; }
+
+    if (id === 'date') {
+      const entering = focus && !fresh;
+      const v = entering ? run.entry : (b.date || '');
+      const want = v[0] === '0' ? 2 : String(T.d).length;
+      const cells = entering ? Math.max(want, v.length, 1) : Math.max(v.length, 1);
+      let html = '<div class="spot"><div class="digits">';
+      for (let i = 0; i < cells; i++) {
+        const ch = v[i];
+        const cls = 't-num num' + (!entering && !fresh ? ' old' : '') + (landing && i === v.length - 1 ? ' landing' : '');
+        html += `<span class="cell${ch !== undefined ? ' filled' : ''}${entering && i === v.length ? ' next' : ''}">${ch !== undefined ? tile(ch, cls) : ''}</span>`;
+      }
+      el.innerHTML = html + '</div></div>';
+      el.classList.toggle('has', !!v);
+      el.setAttribute('aria-label', `Date: ${entering ? (v ? v + ', keep going' : 'empty') : slotLabel('date')}`);
+      return;
+    }
+
+    if (id === 'activities') {
+      const list = b.activities || [];
+      const cls = fresh ? '' : 'old';
+      let html = list.map((a, i) => {
+        const A = ACTIVITIES.find(x => x.id === a);
+        return A ? picTile(A.name, A.em, A.c, cls + (landing && i === list.length - 1 ? ' landing' : '')) : '';
+      }).join('');
+      /* while zoomed in, the plan shows as outlines to match */
+      const ghosts = focus ? todayPlan().filter(p => !(fresh && list.includes(p.id))) : [];
+      if (focus && !fresh) html = '';
+      html += ghosts.map(p => { const A = ACTIVITIES.find(x => x.id === p.id); return `<span class="ghost" aria-hidden="true"><span class="em">${A.em}</span>${A.name}</span>`; }).join('');
+      const any = html !== '';
+      el.innerHTML = `<div class="spot">${any ? `<div class="acts">${html}</div>` : (b.activities && fresh ? '—' : '?')}</div>`;
+      el.classList.toggle('has', any);
+      el.setAttribute('aria-label', `Activities: ${slotLabel('activities')}`);
+      return;
+    }
+
+    const v = b[id];
+    const has = v !== undefined && v !== null;
+    el.classList.toggle('has', has);
+    el.innerHTML = `<div class="spot">${has ? placedHTML(id, v, (fresh ? '' : 'old') + landing) : '?'}</div>`;
+    el.setAttribute('aria-label', `${SLOTS[id].label}: ${slotLabel(id)}`);
+  }
+
+  function renderThermo(fresh, focus) {
+    const el = slotEl('temp');
+    const v = state.board.temp;
+    const i = TEMPS.findIndex(t => t.id === v);
+    el.classList.toggle('has', i >= 0);
+    $('#levels').innerHTML = TEMPS.map((t, k) => `<button class="level${k === i ? ' on' : ''}" type="button" data-temp="${t.id}" style="--lc:${t.c}" aria-pressed="${k === i}" tabindex="${focus ? 0 : -1}">${t.name} <small>${t.range}</small></button>`).join('');
+    const thermo = el.querySelector('.thermo');
+    const arrow = $('#arrow'), merc = $('#mercury');
+    if (i >= 0) {
+      thermo.style.setProperty('--tc', TEMPS[i].c);
+      merc.style.setProperty('--fill', ((5 - i - .5) / 5 * 100) + '%');
+      arrow.style.setProperty('--ay', `calc((100% - var(--bulb) * .6) * ${(i + .5) / 5})`);
+      arrow.classList.remove('off');
+    } else {
+      thermo.style.removeProperty('--tc');
+      merc.style.setProperty('--fill', '0%');
+      arrow.classList.add('off');
+    }
+    el.setAttribute('aria-label', `Temperature: ${i >= 0 ? TEMPS[i].name : 'empty'}`);
+  }
+
+  function renderAll(opts = {}) {
+    SLOT_IDS.forEach(id => renderSlot(id, opts));
+    const stale = staleSecs();
+    const next = stale[0];
+    SECTIONS.forEach(s => {
+      const el = secEl(s.id);
+      const isStale = stale.includes(s.id);
+      const isFocus = run.mode === 'zoom' && run.sec === s.id;
+      el.classList.toggle('stale', isStale);
+      el.classList.toggle('fresh', !isStale);
+      el.classList.toggle('next', run.mode === 'overview' && s.id === next);
+      el.classList.toggle('focus', isFocus);
+      el.tabIndex = isFocus ? -1 : 0;
+      el.setAttribute('role', isFocus ? 'group' : 'button');
+      el.setAttribute('aria-label', `${s.name}: ${isStale ? 'needs updating' : 'all set'}`);
+    });
+    renderTools();
+    applyInert();
+  }
+  /* hidden controls stay out of reach for taps, Tab and screen readers */
+  function applyInert() {
+    const modal = !rb.hidden || !gpOverlay.hidden || !ahOverlay.hidden;
+    stage.inert = modal;
+    bar.inert = modal || run.mode === 'zoom';
+    back.inert = tray.inert = modal || run.mode !== 'zoom';
+  }
+  let lastFocus = null, lastAct = null;
+  function openOverlay(el) {
+    lastFocus = document.activeElement;
+    lastAct = lastFocus && lastFocus.dataset ? lastFocus.dataset.act || null : null;
+    el.hidden = false;
+    applyInert();
+    const c = el.querySelector('.card-head .round');
+    if (c) c.focus({ preventScroll: true });
+  }
+
+  /* ── Name tabs ── */
+  function renderTabs() {
+    kidsBar.innerHTML = kids.length < 2 ? '' : kids.map(k => `<button class="kid-tab" type="button" data-kid="${k.id}" style="--kc:${k.color}" aria-pressed="${k.id === kid.id}" aria-label="${esc(k.name)}" title="${esc(k.name)}"><span class="av" aria-hidden="true">${k.avatar}</span><span class="nm" aria-hidden="true">${esc(k.name)}</span></button>`).join('');
+  }
+  function switchKid(id) {
+    if (id === kid.id || !kids.some(k => k.id === id)) return;
+    if (dayOffset) setDay(0);
+    save();
+    kid = kids.find(k => k.id === id);
+    prefs.kid = id; savePrefs();
+    state = loadBoard(id);
+    run.misses = {}; run.wrong = {}; run.prompted = false;
+    const tabFocused = kidsBar.contains(document.activeElement);
+    renderTabs();
+    if (tabFocused) { const t = kidsBar.querySelector('[aria-pressed="true"]'); if (t) t.focus({ preventScroll: true }); }
+    zoomOut({ announce: false }).then(() => sayIds([coachMsgId()]));
+  }
+
+  /* ── Small tools (overview) ── */
+  function coachMsgId() {
+    const stale = staleSecs();
+    if (!stale.length) return 'gen.done';
+    if (stale.length === SECTIONS.length) return 'gen.start';
+    return run.prompted ? 'next.' + stale[0] : 'gen.morning';
+  }
+  /* built once, then only updated, so a focused button keeps its focus */
+  function renderTools() {
+    if (!tools.children.length) tools.innerHTML = `
+      <span class="practice" hidden>Practice</span>
+      <button class="tool" type="button" data-act="say" title="What do I do?" aria-label="What do I do?">${ICON.speaker}</button>
+      <button class="tool" type="button" data-act="readback" title="Read it back" aria-label="Read it back">${ICON.book}</button>
+      <button class="tool" type="button" data-act="ahead" title="Tomorrow" aria-label="Tomorrow">${ICON.moon}</button>
+      <button class="tool" type="button" data-act="grownups" title="Grown-ups" aria-label="Grown-ups">${ICON.gear}</button>
+      <a class="tool" href="hub.html" title="Family Hub" aria-label="Family Hub">${ICON.home}</a>`;
+    const pr = tools.querySelector('.practice');
+    pr.hidden = !dayOffset;
+    pr.title = dayOffset ? `Practice: pretending it’s ${DAYS[T.wd]}, ${MONTHS[T.m]} ${T.d}` : '';
+    tools.querySelector('[data-act="readback"]').classList.toggle('ready', !staleSecs().length);
+  }
+
+  /* ── Magnet tray (zoom) ── */
+  function neutral() {
+    const id = run.slot;
+    if (!id) return '';
+    if (id === 'activities') {
+      const plan = todayPlan();
+      if (plan.length) return 'Today’s plan: ' + plan.map(p => ACTIVITIES.find(a => a.id === p.id).name).join(', ') + '.';
+    }
+    const f = forecast(0);
+    if (f && id === 'temp') return `${f.sample ? 'Sample weather report' : 'Weather report'}: up to ${f.hi}°, ${TEMPS.find(t => t.id === f.temp).name.toLowerCase()}. ${ASKS.temp[1]}`;
+    if (f && id === 'weather') return `${f.sample ? 'Sample weather report' : 'Weather report'}: ${WEATHER.find(w => w.id === f.weather).name.toLowerCase()}. ${ASKS.weather[1]}`;
+    return ASKS[id][1] || 'Tap a magnet to put it on the board.';
+  }
+  function renderTray() {
+    const id = run.slot;
+    const f = document.activeElement, keep = f && surface.contains(f) ? (f.dataset.v ?? f.dataset.act ?? null) : null;
+    if (run.mode !== 'zoom' || !id) { surface.innerHTML = ''; return; }
+    const S = SLOTS[id];
+    const opts = S.options();
+    const misses = run.misses[id] || 0;
+    const wrong = run.wrong[id] || [];
+    let glowV = null;
+    if (misses >= 2 && S.kind === 'digits') glowV = ((run.entry[0] === '0' ? '0' : '') + S.answer())[run.entry.length] ?? null;
+    else if (misses >= 2 && S.kind === 'fact') glowV = S.answer();
+    const fresh = slotFresh(id);
+    const cur = state.board[id];
+    const todays = S.kind === 'multi' ? (fresh ? (cur || []) : []) : null;
+    const ask = ASKS[id][0];
+    const secSlots = SEC[run.sec].slots;
+    const step = secSlots.length > 1 ? ` · ${secSlots.indexOf(id) + 1} of ${secSlots.length}` : '';
+    surface.innerHTML = `
+      <div class="eyebrow">${S.label}${step}</div>
+      <div class="ask">
+        <h2>${ask}</h2>
+        <button class="round" type="button" data-act="say" aria-label="Say it again">${ICON.speaker}</button>
+      </div>
+      <div class="bubble ${feedback.tone}" id="bubble" aria-live="off">${feedback.text || neutral()}</div>
+      <div class="picks${S.rows ? ' flow' : ''}" style="--cols:${S.cols}${S.rows ? `;--rows:${S.rows}` : ''}">
+        ${opts.map(o => {
+          if (o.heading) return `<div class="picks-head">${o.heading}</div>`;
+          const chosen = S.kind === 'multi' ? todays.includes(o.v) : (S.kind === 'free' && fresh && cur === o.v);
+          const cls = ['pick', o.cls || '', wrong.includes(o.v) ? 'nope' : '', glowV !== null && String(glowV) === String(o.v) ? 'glow' : '', chosen ? 'chosen' : ''].join(' ').replace(/\s+/g, ' ');
+          return `<button class="${cls}" type="button" data-v="${o.v}" aria-label="${o.label}"${chosen ? ' aria-pressed="true"' : ''}>${o.html}${o.cap ? `<span class="cap">${o.cap}</span>` : ''}</button>`;
+        }).join('')}
+      </div>
+      <div class="foot">${S.kind === 'multi'
+        ? (todays.length ? '<button class="btn" type="button" data-act="acts-done">That’s all</button>' : todayPlan().length ? '' : '<button class="btn quiet" type="button" data-act="acts-none">Nothing special today</button>')
+        : ''}</div>`;
+    if (keep !== null) {
+      const t = [...surface.querySelectorAll('[data-v], [data-act]')].find(x => (x.dataset.v ?? x.dataset.act) === keep);
+      if (t) t.focus({ preventScroll: true });
+    }
+  }
+  function focusTray() {
+    const p = surface.querySelector('.pick.glow') || surface.querySelector('.pick');
+    if (p) p.focus({ preventScroll: true });
+  }
+  function setFeedback(text, tone = '') {
+    feedback = { text, tone };
+    const b = document.getElementById('bubble');
+    if (b) { b.className = 'bubble ' + tone; b.textContent = text || neutral(); }
+  }
+
+  /* ── Camera ── */
+  let cam = { x: 0, y: 0, s: 1 };
+  function setCam(c, instant) {
+    cam = c;
+    if (instant) camera.classList.add('instant');
+    camera.style.transform = `translate(${c.x}px, ${c.y}px) scale(${c.s})`;
+    if (instant) { void camera.offsetWidth; camera.classList.remove('instant'); }
+  }
+  function stageBox() {
+    const cs = getComputedStyle(stage);
+    const pl = parseFloat(cs.paddingLeft), pr = parseFloat(cs.paddingRight), pt = parseFloat(cs.paddingTop), pb = parseFloat(cs.paddingBottom);
+    return { x0: pl, y0: pt, iw: stage.clientWidth - pl - pr, ih: stage.clientHeight - pt - pb };
+  }
+  function boxIn(el, root) {
+    let x = 0, y = 0;
+    const w = el.offsetWidth, h = el.offsetHeight;
+    while (el && el !== root) { x += el.offsetLeft; y += el.offsetTop; el = el.offsetParent; }
+    return { x, y, w, h };
+  }
+  function overviewCam() {
+    const S = stageBox();
+    const W = board.offsetWidth, H = board.offsetHeight, gap = 10;
+    /* offsets, not bounding boxes: the bar may still be sliding back in */
+    if (app.dataset.orient === 'land') { const edge = bar.offsetLeft + bar.offsetWidth + gap; if (edge > S.x0) { S.iw -= edge - S.x0; S.x0 = edge; } }
+    else { const edge = bar.offsetTop + bar.offsetHeight + gap; if (edge > S.y0) { S.ih -= edge - S.y0; S.y0 = edge; } }
+    const s = Math.max(.1, Math.min(S.iw / W, S.ih / H));
+    return { x: S.x0 + (S.iw - W * s) / 2, y: S.y0 + (S.ih - H * s) / 2, s };
+  }
+  function zoomCam(secId) {
+    const S = stageBox();
+    const b = boxIn(secEl(secId), board);
+    const bx = b.x - 30, by = b.y - 46, bw = b.w + 60, bh = b.h + 76;
+    let ax = S.x0, ay = S.y0 + 58, aw = S.iw, ah = S.ih - 58;
+    if (app.dataset.orient === 'land') aw -= tray.offsetWidth; else ah -= tray.offsetHeight;
+    const s = Math.max(.1, Math.min(aw / bw, ah / bh, 2.2));
+    return { x: ax + (aw - bw * s) / 2 - bx * s, y: ay + (ah - bh * s) / 2 - by * s, s };
+  }
+  /* a section can grow (a countdown, another activity): keep all of it in view */
+  const reframe = () => { if (run.mode === 'zoom' && run.sec) setCam(zoomCam(run.sec)); };
+  const currentCam = () => run.mode === 'zoom' && run.sec ? zoomCam(run.sec) : overviewCam();
+  function orient() {
+    const land = innerWidth > innerHeight * 1.05;
+    app.dataset.orient = land ? 'land' : 'port';
+  }
+
+  /* ── Moving between overview and a section ── */
+  async function zoomTo(secId, slotId) {
+    if (run.busy) return;
+    stopSpeech();
+    const token = ++run.token;
+    run.mode = 'zoom'; run.sec = secId; run.entry = ''; run.lock = null;
+    run.slot = slotId || firstStaleSlot(secId) || SEC[secId].slots[0];
+    run.wrong.date = []; run.misses.date = 0;
+    feedback = { text: '', tone: '' };
+    app.dataset.mode = 'zoom';
+    renderAll(); renderTray();
+    setCam(zoomCam(secId));
+    run.busy = true;
+    await wait(reduce() ? 0 : 480);
+    if (token !== run.token) return;
+    run.busy = false;
+    focusTray();
+    await wait(reduce() ? 0 : 220);
+    if (token === run.token) sayAsk(run.slot);
+  }
+  async function zoomOut({ announce = true } = {}) {
+    stopSpeech();
+    if (announce) run.prompted = true;
+    const token = ++run.token;
+    const prev = run.sec;
+    const hadFocus = tray.contains(document.activeElement) || document.activeElement === back || document.activeElement === document.body;
+    run.mode = 'overview'; run.sec = null; run.slot = null; run.entry = ''; run.lock = null;
+    app.dataset.mode = 'overview';
+    renderAll(); renderTray();
+    setCam(overviewCam());
+    if (prev && hadFocus) secEl(prev).focus({ preventScroll: true });
+    run.busy = true;
+    await wait(reduce() ? 0 : 750);
+    if (token !== run.token) return;
+    run.busy = false;
+    const stale = staleSecs();
+    if (!stale.length) { if (state.celebrated !== T.key) celebrate(); }
+    else if (announce) sayIds(['next.' + stale[0]]);
+  }
+  function goSlot(id) {
+    run.token++;
+    run.slot = id; run.entry = ''; run.lock = null;
+    if (id === 'date') { run.wrong.date = []; run.misses.date = 0; }
+    feedback = { text: '', tone: '' };
+    renderAll(); renderTray(); focusTray();
+    sayAsk(id);
+  }
+
+  /* ── Choosing magnets ── */
+  function miss(id, v, btn) {
+    if (btn) { btn.classList.remove('wiggle'); void btn.offsetWidth; }
+    /* the same wrong magnet again (or a double tap) is not a new mistake */
+    if ((run.wrong[id] || []).includes(v)) { bonk(); if (btn) btn.classList.add('wiggle'); return; }
+    run.misses[id] = (run.misses[id] || 0) + 1;
+    (run.wrong[id] = run.wrong[id] || []).push(v);
+    bonk();
+    if (btn) btn.classList.add('wiggle');
+    const S = SLOTS[id];
+    const ids = run.misses[id] >= 2 ? revealIds(id) : (S.wrong ? S.wrong(v) : S.hint());
+    setTimeout(() => { if (run.slot === id) { renderTray(); setFeedback(textOf(ids), 'try'); } }, 450);
+    sayIds(ids, { delay: .3 });
+  }
+
+  function choose(id, v, btn) {
+    if (run.busy || run.lock || run.slot !== id) return;
+    const S = SLOTS[id];
+    const from = btn ? btn.querySelector('.tile') : null;
+    if (S.kind === 'fact') {
+      if (!isRight(id, v)) return miss(id, v, btn);
+      state.board[id] = v;
+      run.misses[id] = 0; run.wrong[id] = [];
+      return place(id, from, S.confirm(v));
+    }
+    if (S.kind === 'digits') {
+      const nextVal = run.entry + v, t = S.answer();
+      const ok = t.startsWith(nextVal) || (T.d < 10 && ('0' + t).startsWith(nextVal));
+      if (!ok) return miss(id, v, btn);
+      run.misses.date = 0; run.wrong.date = [];
+      if (dateDone(nextVal)) { state.board.date = nextVal; run.entry = ''; return place(id, from, S.confirm()); }
+      run.entry = nextVal;
+      return place(id, from, ['date.more'], { stay: true });
+    }
+    if (S.kind === 'multi') {
+      const list = slotFresh(id) ? [...(state.board.activities || [])] : [];
+      const at = list.indexOf(v);
+      if (at >= 0) {
+        if (run.added && run.added.v === v && performance.now() - run.added.t < 900) return;   /* a double tap, not "take it off" */
+        run.token++;
+        list.splice(at, 1); state.board.activities = list;
+        /* taking every magnet off is not the same as "Nothing special today" */
+        if (list.length) state.setOn.activities = T.key; else delete state.setOn.activities;
+        save(); renderAll(); renderTray(); reframe(); clack();
+        return;
+      }
+      if (list.length >= MAX_ACTS) { const ids = ['gen.full']; setFeedback(textOf(ids), 'try'); sayIds(ids); return; }
+      list.push(v);
+      state.board.activities = list; state.setOn.activities = T.key;
+      const plan = todayPlan().map(p => p.id);
+      const planDone = plan.includes(v) && plan.every(p => list.includes(p));
+      run.added = { v, t: performance.now() };
+      return place(id, from, planDone ? [...S.confirm(v), 'gen.planall'] : S.confirm(v), { stay: !planDone && list.length < MAX_ACTS });
+    }
+    state.board[id] = v; state.setOn[id] = T.key;
+    if (id === 'temp') {
+      run.lock = 'temp';
+      state.sample = false; save();
+      renderAll(); renderTray(); clack(); chime();
+      const ids = S.confirm(v);
+      setFeedback(textOf(ids), 'good');
+      return after(id, sayIds(ids));
+    }
+    place(id, from, S.confirm(v));
+  }
+
+  async function place(id, from, ids, opts = {}) {
+    state.sample = false; save();
+    const token = run.token;
+    /* a finished answer locks the slot; a first date digit or an extra activity keeps the tray live */
+    if (!opts.stay) { run.busy = true; run.lock = id; }
+    renderAll({ landing: id });
+    await fly(from, id);
+    if (token !== run.token) return;
+    if (!opts.stay) run.busy = false;
+    chime();
+    const spoken = sayIds(ids, { delay: .15 });
+    renderTray();
+    setFeedback(textOf(ids), 'good');
+    reframe();
+    if (!opts.stay) after(id, spoken);
+  }
+
+  async function after(id, spoken) {
+    const token = ++run.token, sec = run.sec;
+    const next = firstStaleSlot(sec);
+    await Promise.race([Promise.all([spoken, wait(next ? 500 : 900)]), wait(7000)]);
+    if (token !== run.token) return;
+    run.lock = null;
+    if (next) goSlot(next);
+    else zoomOut();
+  }
+
+  function fly(fromTile, slotId) {
+    const target = slotEl(slotId).querySelector('.tile.landing');
+    if (!target) return Promise.resolve();
+    const done = () => { target.classList.remove('landing'); target.classList.add('snap'); clack(); };
+    if (!fromTile || reduce() || !fromTile.animate) { done(); return Promise.resolve(); }
+    const a = fromTile.getBoundingClientRect(), b = target.getBoundingClientRect();
+    if (!b.width || !a.width) { done(); return Promise.resolve(); }
+    const ghost = fromTile.cloneNode(true);
+    ghost.classList.add('flyer');
+    const cs = getComputedStyle(fromTile);
+    Object.assign(ghost.style, { left: a.left + 'px', top: a.top + 'px', width: a.width + 'px', height: a.height + 'px', minHeight: '0', fontFamily: cs.fontFamily, fontWeight: cs.fontWeight, fontSize: cs.fontSize, lineHeight: cs.lineHeight, outline: 'none' });
+    document.body.appendChild(ghost);
+    const dx = b.left - a.left + (b.width - a.width) / 2, dy = b.top - a.top + (b.height - a.height) / 2;
+    const sx = Math.max(.3, Math.min(3, b.width / a.width)), sy = Math.max(.3, Math.min(3, b.height / a.height));
+    const anim = ghost.animate([
+      { transform: 'translate(0,0) scale(1,1) rotate(0deg)' },
+      { transform: `translate(${dx * .5}px, ${dy * .5 - 50}px) scale(${(1 + sx) / 2 * 1.06}, ${(1 + sy) / 2 * 1.06}) rotate(-4deg)`, offset: .55 },
+      { transform: `translate(${dx}px, ${dy}px) scale(${sx}, ${sy}) rotate(0deg)` }
+    ], { duration: 540, easing: 'cubic-bezier(.45,.05,.3,1)' });
+    return anim.finished.then(() => { ghost.remove(); done(); }, () => { ghost.remove(); done(); });
+  }
+
+  /* ── Tomorrow: day, weather and plan, read aloud ── */
+  function aheadLines() {
+    const D = todayInfo(shifted(1)), f = forecast(1), plan = planFor(1, kid).map(p => p.id);
+    const out = [{ ids: ['day.tom.' + D.wd] }];
+    if (D.todays && D.todays.start === D.n) out.push({ ids: ['hol.next.' + D.todays.key, 'sleeps.1'] });
+    if (f && !f.sample) {
+      out.push({ ids: ['tmr.wx.' + f.weather] }, { ids: ['tmr.temp.' + f.temp] });
+      if (f.chilly && f.temp !== 'cold' && f.temp !== 'freezing') out.push({ ids: ['tmr.chilly'] });
+    }
+    out.push({ ids: planIds(plan, 'tomorrow'), gap: .07 });
+    return out;
+  }
+  function renderAhead() {
+    const D = todayInfo(shifted(1)), f = forecast(1), plan = planFor(1, kid);
+    const W = f && WEATHER.find(w => w.id === f.weather), TP = f && TEMPS.find(t => t.id === f.temp);
+    ahBody.innerHTML = `
+      <div class="ah-grid">
+        <section class="ah-box">
+          <div class="ah-label">Tomorrow is</div>
+          ${tile(DAYS[D.wd], 't-day')}
+          <div class="ah-big">${MONTHS[D.m]} ${D.d}</div>
+          ${D.todays ? `<div class="ah-big">${D.todays.em} ${D.todays.the ? 'The ' : ''}${esc(D.todays.name)}!</div>` : ''}
+        </section>
+        <section class="ah-box">
+          <div class="ah-label">Weather</div>
+          ${f ? `${tile(W.name, 't-sky dark-ink', null, W.em)}
+          <span class="ah-band" style="--tc:${TP.c}">${TP.name} · up to ${f.hi}°</span>
+          ${f.sample ? '<div class="ah-note">Sample weather. At home this comes from the Family Hub’s forecast.</div>'
+            : `<div class="ah-wear" aria-label="What to wear">${f.wear}</div>${f.chilly && f.temp !== 'cold' && f.temp !== 'freezing' ? '<div class="ah-note">Chilly in the morning: bring a jacket.</div>' : ''}`}`
+          : `<div class="ah-note">${hubZip() ? 'No weather report right now. Try again in a little while.' : 'No weather report yet. It comes from the Family Hub when its ZIP code is set.'}</div>`}
+        </section>
+        <section class="ah-box">
+          <div class="ah-label">${esc(kid.name)}’s plans</div>
+          <div class="ah-acts">${plan.length ? plan.map(p => { const A = ACTIVITIES.find(a => a.id === p.id); return picTile(A.name, A.em, A.c); }).join('') : '<div class="ah-big">Nothing special</div>'}</div>
+        </section>
+      </div>`;
+  }
+  function openAhead() {
+    renderAhead();
+    if (ahOverlay.hidden) openOverlay(ahOverlay);
+    sayLines(aheadLines());
+  }
+
+  /* ── Celebration and read-back ── */
+  function lines() {
+    const b = state.board, f = slotFresh;
+    const BL = '<span class="blank" aria-label="blank"></span>';
+    const W = (t, c) => `<span class="w" style="--wc:${c}">${t}</span>`;
+    const L = [];
+    const day = (slot, frame, key) => L.push(f(slot) ? { html: `${frame} ${W(DAYS[b[slot]], 'var(--t-day)')}.`, ids: [`day.${key}.${b[slot]}`] } : { html: `${frame} ${BL}.`, ids: [] });
+    day('today', 'Today is', 'today');
+    day('yesterday', 'Yesterday was', 'yest');
+    day('tomorrow', 'Tomorrow will be', 'tom');
+    L.push(f('month') ? { html: `The month is ${W(MONTHS[b.month], 'var(--t-month)')}.`, ids: ['month.is.' + b.month] } : { html: `The month is ${BL}.`, ids: [] });
+    L.push(f('date') ? { html: `Today is the ${W(ordinal(T.d), 'var(--t-num)')}.`, ids: ['date.is.' + T.d] } : { html: `Today is the ${BL}.`, ids: [] });
+    L.push(f('year') ? { html: `The year is ${W(b.year, 'var(--t-num)')}.`, ids: ['year.is.' + b.year] } : { html: `The year is ${BL}.`, ids: [] });
+    L.push(f('season') ? { html: `It is ${W(SEASONS[b.season].name.toLowerCase(), SEASONS[b.season].c)}.`, ids: ['season.is.' + b.season] } : { html: `It is ${BL}.`, ids: [] });
+    const t = f('temp') && TEMPS.find(x => x.id === b.temp);
+    L.push(t ? { html: `It is ${W(t.name.toLowerCase(), t.c)} outside.`, ids: ['temp.short.' + t.id] } : { html: `It is ${BL} outside.`, ids: [] });
+    const w = f('weather') && WEATHER.find(x => x.id === b.weather);
+    L.push(w ? { html: `It is ${W(w.name.toLowerCase(), 'var(--t-sky-ink)')} today.`, ids: ['weather.' + w.id] } : { html: `It is ${BL} today.`, ids: [] });
+    if (f('activities')) {
+      const acts = (b.activities || []).map(a => ACTIVITIES.find(x => x.id === a)).filter(Boolean);
+      const A = a => W(a.name.toLowerCase(), a.c);
+      if (!acts.length) L.push({ html: CAT['gen.nothing'].text, ids: ['gen.nothing'] });
+      else if (acts.length === 1) L.push({ html: `Today’s plans: ${A(acts[0])}.`, ids: ['plan.one.' + acts[0].id] });
+      else {
+        const last = acts[acts.length - 1], rest = acts.slice(0, -1);
+        L.push({ html: `Today’s plans: ${rest.map(A).join(', ')} and ${A(last)}.`, ids: ['gen.plans', ...rest.map(a => 'plan.item.' + a.id), 'plan.last.' + last.id], gap: .07 });
+      }
+    } else L.push({ html: `Today’s plans: ${BL}.`, ids: [] });
+    if (f('holiday')) {
+      if (b.holiday === 'none') {
+        const n = T.next && sleepsTo(T.next);
+        L.push({
+          html: `No holiday today.${T.next ? ` The next holiday is ${T.next.the ? 'the ' : ''}${W(T.next.name, T.next.c)}. ${n === 1 ? 'Just one more sleep!' : `${n} more sleeps!`}` : ''}`,
+          ids: SLOTS.holiday.confirm('none')
+        });
+      } else { const h = HOLS[holKey(b.holiday)]; L.push({ html: `Today is ${h.the ? 'the ' : ''}${W(h.name, h.c)}!`, ids: ['hol.today.' + holKey(b.holiday)] }); }
+    } else L.push({ html: `Is today a holiday? ${BL}`, ids: [] });
+    const fe = f('feel') && FEELINGS.find(x => x.id === b.feel);
+    L.push(fe ? { html: `I feel ${W(fe.name.toLowerCase(), '#b07a00')}.`, ids: ['feel.short.' + fe.id] } : { html: `I feel ${BL}.`, ids: [] });
+    return L;
+  }
+  function renderLines() {
+    rbLines.innerHTML = lines().map((l, i) => `<button class="line" type="button" data-line="${i}">${l.html}</button>`).join('');
+  }
+  function openReadback(autoRead) {
+    if (rb.hidden) { renderLines(); openOverlay(rb); }
+    if (autoRead) readAll();
+  }
+  function closeOverlay(el) {
+    el.hidden = true; stopSpeech(); applyInert();
+    if (lastFocus && !document.contains(lastFocus) && lastAct) lastFocus = tools.querySelector(`[data-act="${lastAct}"]`);
+    if (lastFocus && document.contains(lastFocus) && !lastFocus.closest('[inert]')) lastFocus.focus({ preventScroll: true });
+    lastFocus = null; lastAct = null;
+  }
+  function readAll() {
+    const all = lines();
+    const btns = [...rbLines.querySelectorAll('.line')];
+    const todo = all.map((l, i) => ({ ...l, i })).filter(l => l.ids.length);
+    if (!todo.length) return sayIds(['gen.readfirst']);
+    const clear = () => btns.forEach(x => x.classList.remove('reading'));
+    return sayLines(todo.map(l => ({
+      ids: l.ids,
+      onstart: () => { clear(); const el = btns[l.i]; if (el) { el.classList.add('reading'); el.scrollIntoView({ block: 'nearest', behavior: reduce() ? 'auto' : 'smooth' }); } }
+    }))).then(clear);
+  }
+  function celebrate() {
+    state.celebrated = T.key; save();
+    tada(); confetti();
+    const p = sayIds(['gen.done'], { delay: .6 }), who = kid.id;
+    setTimeout(() => {
+      if (!rb.hidden || !ahOverlay.hidden || !gpOverlay.hidden || kid.id !== who || run.mode !== 'overview') return;
+      openReadback(false);
+      Promise.race([p, wait(4000)]).then(() => { if (!rb.hidden) readAll(); });
+    }, 1100);
+  }
+  function confetti() {
+    if (reduce()) return;
+    const c = document.createElement('canvas'); c.className = 'confetti'; app.appendChild(c);
+    const W = app.clientWidth, H = app.clientHeight;
+    const ctx = c.getContext('2d'), dpr = devicePixelRatio || 1;
+    c.width = W * dpr; c.height = H * dpr; ctx.scale(dpr, dpr);
+    const cols = ['#2f9a49', '#d9362b', '#2b62c8', '#ffd23f', '#ef8a1f', '#9bd6f7', '#6a4fd1'];
+    const P = Array.from({ length: 150 }, () => ({
+      x: W / 2 + (Math.random() - .5) * W * .3, y: H * .35,
+      vx: (Math.random() - .5) * 16, vy: -Math.random() * 15 - 5, r: Math.random() * 6.28, vr: (Math.random() - .5) * .4,
+      w: 8 + Math.random() * 10, h: 5 + Math.random() * 5, c: cols[(Math.random() * cols.length) | 0]
+    }));
+    const t0 = performance.now();
+    (function step(t) {
+      const el = t - t0;
+      ctx.clearRect(0, 0, W, H);
+      ctx.globalAlpha = Math.max(0, 1 - Math.max(0, el - 2000) / 800);
+      P.forEach(p => {
+        p.vy += .45; p.vx *= .99; p.x += p.vx; p.y += p.vy; p.r += p.vr;
+        ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.r); ctx.fillStyle = p.c; ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h); ctx.restore();
+      });
+      if (el < 2800) requestAnimationFrame(step); else c.remove();
+    })(t0);
+  }
+
+  /* ── Voice: recorded clips first, the device's best voice as a fallback ── */
+  function phrase(id) {
+    if (CAT[id]) return CAT[id];
+    let m;
+    if ((m = /^year\.(is|last)\.(\d+)$/.exec(id))) return { text: `${m[1] === 'is' ? 'The year is' : 'Last year was'} ${m[2]}.` };
+    if ((m = /^sleeps\.(\d+)$/.exec(id))) return { text: `${m[1]} more sleeps!` };
+    return null;
+  }
+  const textOf = ids => ids.map(id => (phrase(id) || {}).text || '').join(' ').trim();
+  let ac = null, voiceBus = null;
+  function audioCtx() {
+    if (ac) { if (ac.state === 'suspended') ac.resume().catch(() => {}); return ac; }
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      try { ac = new AC({ sampleRate: 24000 }); } catch (e) { ac = new AC(); }
+      voiceBus = ac.createGain(); voiceBus.gain.value = 1; voiceBus.connect(ac.destination);
+    } catch (e) { ac = null; }
+    return ac;
+  }
+  const VOICE = { index: null, raw: {}, buf: {}, failed: {} };
+  const SPRITE_ORDER = ['core', 'date', 'days', 'outside', 'me', 'month', 'year', 'holiday', 'sleeps'];
+  fetch('voice/index.json').then(r => r.ok ? r.json() : null).then(j => {
+    VOICE.index = j;
+    if (j && prefs.voice === 'natural') {
+      const names = [...SPRITE_ORDER.filter(n => j.sprites[n]), ...Object.keys(j.sprites).filter(n => !SPRITE_ORDER.includes(n))];
+      names.reduce((p, n) => p.then(() => rawSprite(n).catch(() => {})), Promise.resolve());
+    }
+  }).catch(() => {});
+  function rawSprite(n) {
+    if (!VOICE.raw[n]) VOICE.raw[n] = fetch('voice/' + VOICE.index.sprites[n]).then(r => { if (!r.ok) throw new Error('missing'); return r.arrayBuffer(); });
+    return VOICE.raw[n];
+  }
+  function sprite(n) {
+    if (!VOICE.buf[n]) {
+      VOICE.buf[n] = rawSprite(n).then(ab => new Promise((res, rej) => {
+        const a = audioCtx(); if (!a) return rej(new Error('no audio'));
+        const p = a.decodeAudioData(ab, res, rej);
+        if (p && p.catch) p.catch(rej);
+      }));
+      VOICE.buf[n].catch(() => {
+        /* try a broken file once more, then leave it to the device voice */
+        VOICE.failed[n] = (VOICE.failed[n] || 0) + 1;
+        if (VOICE.failed[n] < 2) { delete VOICE.buf[n]; delete VOICE.raw[n]; }
+      });
+    }
+    return VOICE.buf[n];
+  }
+  let speechRun = 0, sources = [], timers = [], pending = [];
+  function stopSpeech() {
+    speechRun++;
+    pending.splice(0).forEach(r => r());
+    sources.forEach(s => { try { s.stop(); } catch (e) {} });
+    sources = [];
+    timers.forEach(clearTimeout); timers = [];
+    try { window.speechSynthesis && speechSynthesis.cancel(); } catch (e) {}
+  }
+  const sayIds = (ids, opts) => sayLines([{ ids }], opts);
+  const swait = ms => new Promise(res => { pending.push(res); timers.push(setTimeout(res, Math.max(0, ms))); });
+  async function sayLines(list, { gapLine = .5, gapSeg = .18, delay = 0 } = {}) {
+    stopSpeech();
+    const myRun = speechRun;
+    live.textContent = list.map(l => textOf(l.ids)).join(' ');
+    if (prefs.voice === 'off' || !list.some(l => l.ids.length)) return;
+    const clip = id => VOICE.index && VOICE.index.clips[id];
+    let natural = prefs.voice === 'natural' && !!VOICE.index && !!audioCtx();
+    const bufs = {};
+    if (natural) {
+      const names = [...new Set(list.flatMap(l => l.ids).map(id => clip(id) && clip(id)[0]).filter(Boolean))];
+      /* on a slow connection, use the device voice rather than play a recorded line seconds late */
+      const got = await Promise.race([
+        Promise.allSettled(names.map(n => sprite(n).then(b => { bufs[n] = b; }))),
+        wait(1500).then(() => null)
+      ]);
+      if (myRun !== speechRun) return;
+      if (!got) natural = false;
+    }
+    if (delay) { await swait(delay * 1000); if (myRun !== speechRun) return; }
+    for (let i = 0; i < list.length; i++) {
+      const l = list[i];
+      if (!l.ids.length) continue;
+      const recorded = natural && l.ids.every(id => clip(id) && bufs[clip(id)[0]]);
+      await (recorded ? playClips(l, myRun, l.gap ?? gapSeg, bufs) : deviceSay([l], myRun));
+      if (myRun !== speechRun) return;
+      if (i < list.length - 1) { await swait(gapLine * 1000); if (myRun !== speechRun) return; }
+    }
+  }
+  async function playClips(l, myRun, gap, bufs) {
+    const a = audioCtx();
+    if (a.state === 'suspended') await Promise.race([a.resume().catch(() => {}), wait(300)]);
+    if (myRun !== speechRun) return;
+    let t = a.currentTime + .03;
+    if (l.onstart) l.onstart();
+    l.ids.forEach((id, k) => {
+      const [n, st, du] = VOICE.index.clips[id];
+      const src = a.createBufferSource();
+      src.buffer = bufs[n]; src.connect(voiceBus); src.start(t, st, du);
+      sources.push(src);
+      t += du + (k < l.ids.length - 1 ? gap : 0);
+    });
+    return swait((t - a.currentTime) * 1000);
+  }
+  function rankVoice(v) {
+    if (!/^en([-_]|$)/i.test(v.lang)) return -1;
+    let s = /^en[-_]US/i.test(v.lang) ? 30 : 15;
+    if (/natural|neural/i.test(v.name)) s += 60;
+    if (/premium|enhanced/i.test(v.name)) s += 45;
+    if (/google/i.test(v.name)) s += 30;
+    if (/online/i.test(v.name)) s += 15;
+    if (/aria|jenny|ava|samantha|allison|emma|michelle|zoe|nicky|joanna|salli/i.test(v.name)) s += 10;
+    if (/compact|espeak|eloquence|albert|bad news|bahh|bells|boing|bubbles|cellos|wobble|fred|jester|junior|kathy|organ|ralph|superstar|trinoids|whisper|zarvox|grandma|grandpa|rocko|shelley|flo|reed|sandy/i.test(v.name)) s -= 70;
+    return s;
+  }
+  function deviceVoices() {
+    try { return speechSynthesis.getVoices().map(v => ({ v, r: rankVoice(v) })).filter(x => x.r >= 0).sort((a, b) => b.r - a.r).map(x => x.v); } catch (e) { return []; }
+  }
+  function deviceVoice() {
+    const vs = deviceVoices();
+    return vs.find(v => v.name === prefs.deviceVoice) || vs[0] || null;
+  }
+  function deviceSay(list, myRun) {
+    return new Promise(res => {
+      pending.push(res);
+      try {
+        const synth = window.speechSynthesis;
+        const segs = list.map(l => ({ text: textOf(l.ids), onstart: l.onstart })).filter(s => s.text);
+        if (!synth || !segs.length) return res();
+        const v = deviceVoice();
+        segs.forEach((s, i) => {
+          const u = new SpeechSynthesisUtterance(s.text);
+          u.rate = .95; u.pitch = 1;
+          if (v) { u.voice = v; u.lang = v.lang; }
+          u.onstart = () => { if (myRun === speechRun && s.onstart) s.onstart(); };
+          if (i === segs.length - 1) u.onend = u.onerror = () => res();
+          synth.speak(u);
+        });
+        timers.push(setTimeout(res, 20000));
+      } catch (e) { res(); }
+    });
+  }
+
+  /* ── Sound effects ── */
+  function tone(f, at, dur, type = 'sine', vol = .16, f2) {
+    if (!prefs.sound) return;
+    const a = audioCtx(); if (!a) return;
+    const t = a.currentTime + at;
+    const o = a.createOscillator(), g = a.createGain();
+    o.type = type; o.frequency.setValueAtTime(f, t);
+    if (f2) o.frequency.exponentialRampToValueAtTime(f2, t + dur);
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol, t + .012); g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+    o.connect(g).connect(a.destination); o.start(t); o.stop(t + dur + .05);
+  }
+  function clack() {
+    if (!prefs.sound) return;
+    const a = audioCtx(); if (!a) return;
+    const len = Math.floor(a.sampleRate * .05), buf = a.createBuffer(1, len, a.sampleRate), d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 4);
+    const s = a.createBufferSource(), bp = a.createBiquadFilter(), g = a.createGain();
+    bp.type = 'bandpass'; bp.frequency.value = 1500; bp.Q.value = 1.4; g.gain.value = .5;
+    s.buffer = buf; s.connect(bp).connect(g).connect(a.destination); s.start();
+    tone(170, 0, .08, 'sine', .2, 90);
+  }
+  const chime = () => { tone(784, .02, .18, 'sine', .1); tone(1175, .1, .3, 'sine', .08); };
+  const bonk = () => tone(300, 0, .28, 'triangle', .12, 190);
+  const tada = () => [523, 659, 784, 1047].forEach((f, i) => tone(f, i * .1, i === 3 ? .5 : .2, 'triangle', .1));
+
+  /* ── Grown-ups ── */
+  let removing = null, removingAt = 0, rtKid = null;
+  function renderGrownups() {
+    const rk = kids.find(k => k.id === rtKid) || kid;
+    const vs = deviceVoices().slice(0, 12);
+    const dv = deviceVoice();
+    gp.innerHTML = `
+      ${state.sample ? '<p>This board started from a sample of yesterday, so on the first visit only the parts that change each day glow.</p>' : ''}
+      <p>Answers are checked against this device’s date: <b>${DAYS[T.wd]}, ${MONTHS[T.m]} ${T.d}, ${T.y}</b>${dayOffset ? ' (practice mode)' : ''}. Temperature, weather, activities and feelings change every day, so they glow every morning.</p>
+      <div>
+        <h3>Children</h3>
+        ${kids.map(k => `<div class="kid-row" data-kid-row="${k.id}">
+          <select data-k="avatar" aria-label="${esc(k.name)}’s picture">${AVATARS.map(a => `<option${a === k.avatar ? ' selected' : ''}>${a}</option>`).join('')}</select>
+          <input type="text" data-k="name" value="${esc(k.name)}" maxlength="20" autocomplete="off" aria-label="Name">
+          <label class="chk"><input type="checkbox" data-k="school"${k.school ? ' checked' : ''}> Goes to school</label>
+          ${kids.length > 1 && removing !== k.id ? '<button class="btn quiet" type="button" data-k="remove">Remove</button>' : ''}
+        </div>
+        ${removing === k.id ? `<div class="kid-confirm" data-kid-row="${k.id}">Remove ${esc(k.name)} and ${esc(k.name)}’s board?
+          <button class="btn quiet" type="button" data-k="cancel">Cancel</button>
+          <button class="btn danger" type="button" data-k="confirm">Yes, remove</button></div>` : ''}`).join('')}
+        ${kids.length < 4 ? '<div class="row" style="margin-top:8px"><button class="btn quiet" type="button" data-gp="add-kid">+ Add a child</button></div>' : ''}
+      </div>
+      <div>
+        <h3>Weekly routine</h3>
+        ${kids.length > 1 ? `<div class="seg" role="group" aria-label="Whose routine" style="margin-bottom:8px">${kids.map(k => `<button type="button" data-rt-kid="${k.id}" aria-pressed="${k.id === rk.id}">${k.avatar} ${esc(k.name)}</button>`).join('')}</div>` : ''}
+        <p>${rk.example ? (sampleMode() ? 'These are examples, shown in the sample. ' : 'These are examples and aren’t used yet. <button class="btn quiet" type="button" data-gp="use-example">Use these</button> or tap the days to make your own. ') : ''}Tap the days each one happens. “School days only” skips breaks, holidays and school-at-home days.</p>
+        <div class="routine">${ROUTINE_ACTS().map(a => { const r = rk.routine[a.id] || { days: [], schoolOnly: false }; return `
+          <div class="rt-row" data-rt="${a.id}">
+            <span class="rt-name">${a.em} ${a.name}</span>
+            <span class="rt-days">${'SMTWTFS'.split('').map((c, i) => `<button type="button" class="rt-day" data-day="${i}" aria-pressed="${r.days.includes(i)}" aria-label="${DAYS[i]}">${c}</button>`).join('')}</span>
+            ${r.days.length ? `<label class="chk"><input type="checkbox" data-rt-school${r.schoolOnly ? ' checked' : ''}> School days only</label>` : ''}
+          </div>`; }).join('')}
+        </div>
+      </div>
+      <div>
+        <h3>From the family calendar</h3>
+        <p>${hubMembers().length ? 'Using the Family Hub’s calendars on this device.' : 'The Family Hub isn’t connected on this device yet, so only the weekly routine is used.'}
+          ${hubZip() ? ' Weather comes from the hub’s forecast.' : sampleMode() ? ' The weather shown is a sample until the hub is set up here.' : ''}
+          Put a name in an event’s title, like “${esc(kid.name)} – dentist” or “${esc(kid.name)} ABA”, and it shows up as a magnet in that day’s plan. “Kids” counts for everyone.
+          Words it knows: ABA, gym or PE, library, doctor, dentist, birthday, party, play date, piano, soccer, swim, practice, park, vacation.</p>
+        ${hubMembers().length || hubZip() ? '<div class="row" style="margin-top:8px"><a class="btn quiet" href="hub.html">Back to the Family Hub</a></div>' : ''}
+      </div>
+      <div>
+        <h3>Voice</h3>
+        <div class="seg" role="group" aria-label="Voice">
+          <button type="button" data-voice="natural" aria-pressed="${prefs.voice === 'natural'}">Natural voice</button>
+          <button type="button" data-voice="device" aria-pressed="${prefs.voice === 'device'}">This device’s voice</button>
+          <button type="button" data-voice="off" aria-pressed="${prefs.voice === 'off'}">Off</button>
+        </div>
+        <p style="margin-top:8px">${!VOICE.index ? 'The recorded voice didn’t load here, so the device’s voice is used.'
+          : Object.keys(VOICE.failed).length ? 'Some recorded voice files didn’t load, so the device’s voice fills in for those words.'
+          : 'The natural voice is recorded ahead of time, so it sounds the same on every device.'} On an older iPhone, turn off silent mode if you hear nothing.</p>
+        ${prefs.voice === 'device' ? `<div class="row" style="margin-top:8px">
+          ${vs.length ? `<select id="dv" aria-label="Device voice">${vs.map(v => `<option value="${v.name.replace(/"/g, '&quot;')}"${dv && v.name === dv.name ? ' selected' : ''}>${v.name} (${v.lang})</option>`).join('')}</select>` : '<p>No English voices found on this device.</p>'}
+        </div>` : ''}
+        <div class="row" style="margin-top:10px"><button class="btn quiet" type="button" data-gp="try">${ICON.speaker} Try it</button></div>
+      </div>
+      <div>
+        <h3>Sounds</h3>
+        <div class="seg" role="group" aria-label="Sounds">
+          <button type="button" data-sound="on" aria-pressed="${prefs.sound}">On</button>
+          <button type="button" data-sound="off" aria-pressed="${!prefs.sound}">Off</button>
+        </div>
+      </div>
+      <div>
+        <h3>Practice</h3>
+        <div class="row">
+          <button class="btn quiet" type="button" data-gp="tomorrow">Pretend it’s tomorrow</button>
+          ${dayOffset ? '<button class="btn quiet" type="button" data-gp="today">Back to today</button>' : ''}
+        </div>
+        <p style="margin-top:8px">Moves the date ahead one day so you can see which parts glow on a normal morning.</p>
+      </div>
+      <div>
+        <h3>Board</h3>
+        <div class="row">
+          <button class="btn quiet" type="button" data-gp="finish">See it finished</button>
+          <button class="btn quiet" type="button" data-gp="empty">Start with an empty board</button>
+        </div>
+      </div>`;
+  }
+  let realState = null;
+  function setDay(offset) {
+    if (offset && !dayOffset) realState = JSON.parse(JSON.stringify(state));
+    if (!offset && realState) { state = realState; realState = null; }
+    dayOffset = offset;
+    run.prompted = false;
+    T = todayInfo(shifted(0));
+    run.misses = {}; run.wrong = {};
+  }
+
+  /* ── Events ── */
+  let unlocked = false;
+  document.addEventListener('pointerdown', () => {
+    if (unlocked) return;
+    unlocked = true;
+    try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) {}
+    audioCtx();
+    if (VOICE.index) ['core'].forEach(n => VOICE.index.sprites[n] && sprite(n));
+  }, { capture: true });
+
+  board.addEventListener('click', e => {
+    audioCtx();
+    if (run.busy) return;
+    const se = e.target.closest('.sec'); if (!se) return;
+    const sec = se.dataset.sec;
+    if (run.mode === 'zoom' && run.sec === sec) {
+      if (run.lock) return;
+      const lv = e.target.closest('[data-temp]');
+      if (lv) return choose('temp', lv.dataset.temp, null);
+      const sl = e.target.closest('[data-slot]');
+      if (sl && sl.dataset.slot !== run.slot) return goSlot(sl.dataset.slot);
+      return sayAsk(run.slot);
+    }
+    tapSection(sec);
+  });
+  board.addEventListener('keydown', e => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const t = e.target;
+    if (t.matches('.sec') || t.matches('[data-slot]')) { e.preventDefault(); t.click(); }
+  });
+  function tapSection(sec) {
+    const facts = SEC[sec].slots.every(x => SLOTS[x].kind === 'fact' || SLOTS[x].kind === 'digits');
+    if (secFresh(sec) && facts) {
+      const el = secEl(sec);
+      el.animate && !reduce() && el.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.04)' }, { transform: 'scale(1)' }], { duration: 380 });
+      const ids = ['gen.right', ...SEC[sec].slots.flatMap(x => SLOTS[x].confirm(state.board[x]))];
+      return sayIds(ids);
+    }
+    zoomTo(sec);
+  }
+
+  surface.addEventListener('click', e => {
+    audioCtx();
+    const act = e.target.closest('[data-act]');
+    if (act) {
+      const a = act.dataset.act;
+      if (run.busy || run.lock) return;
+      if (a === 'say' && run.slot) sayAsk(run.slot);
+      if (a === 'acts-done') zoomOut();
+      if (a === 'acts-none') {
+        state.board.activities = []; state.setOn.activities = T.key; state.sample = false; save();
+        run.lock = 'activities';
+        renderAll(); renderTray(); reframe();
+        after('activities', sayIds(['gen.nothing']));
+      }
+      return;
+    }
+    const p = e.target.closest('.pick');
+    if (p && run.slot) {
+      const opt = SLOTS[run.slot].options().find(o => !o.heading && String(o.v) === p.dataset.v);
+      if (opt) choose(run.slot, opt.v, p);
+    }
+  });
+
+  tools.addEventListener('click', e => {
+    audioCtx();
+    const act = e.target.closest('[data-act]'); if (!act) return;
+    const a = act.dataset.act;
+    if (a === 'say') sayIds([coachMsgId()]);
+    if (a === 'readback') openReadback(true);
+    if (a === 'ahead') openAhead();
+    if (a === 'grownups') { removing = null; rtKid = null; renderGrownups(); openOverlay(gpOverlay); }
+  });
+  back.addEventListener('click', () => { audioCtx(); if (run.mode === 'zoom') zoomOut(); });
+
+  rbLines.addEventListener('click', e => {
+    const b = e.target.closest('.line'); if (!b) return;
+    const l = lines()[+b.dataset.line];
+    sayIds(l.ids.length ? l.ids : ['gen.finishline']);
+  });
+  $('#read-all').addEventListener('click', () => { audioCtx(); readAll(); });
+  $('#rb-close').addEventListener('click', () => closeOverlay(rb));
+  $('#rb-ahead').addEventListener('click', () => { audioCtx(); closeOverlay(rb); openAhead(); });
+  $('#ah-close').addEventListener('click', () => closeOverlay(ahOverlay));
+  $('#ah-read').addEventListener('click', () => { audioCtx(); sayLines(aheadLines()); });
+  kidsBar.addEventListener('click', e => { audioCtx(); const b = e.target.closest('[data-kid]'); if (b && !run.busy) switchKid(b.dataset.kid); });
+  $('#gp-close').addEventListener('click', () => closeOverlay(gpOverlay));
+  [rb, gpOverlay, ahOverlay].forEach(o => o.addEventListener('click', e => { if (e.target === o) closeOverlay(o); }));
+
+  gp.addEventListener('click', e => {
+    audioCtx();
+    const v = e.target.closest('[data-voice]');
+    if (v) { prefs.voice = v.dataset.voice; savePrefs(); renderGrownups(); if (prefs.voice !== 'off') sayIds(['gen.try']); else stopSpeech(); return; }
+    const s = e.target.closest('[data-sound]');
+    if (s) { prefs.sound = s.dataset.sound === 'on'; savePrefs(); renderGrownups(); if (prefs.sound) chime(); return; }
+    const rtk = e.target.closest('[data-rt-kid]');
+    if (rtk) { rtKid = rtk.dataset.rtKid; renderGrownups(); const b = gp.querySelector(`[data-rt-kid="${rtKid}"]`); if (b) b.focus(); return; }
+    const day = e.target.closest('.rt-day');
+    if (day) {
+      const rk = kids.find(k => k.id === rtKid) || kid;
+      const id = day.closest('[data-rt]').dataset.rt, d = +day.dataset.day;
+      const r = rk.routine[id] || (rk.routine[id] = { days: [], schoolOnly: false });
+      r.days = r.days.includes(d) ? r.days.filter(x => x !== d) : [...r.days, d].sort();
+      if (!r.days.length) delete rk.routine[id];
+      rk.example = false; saveKids(); renderGrownups(); renderAll();
+      const again = gp.querySelector(`[data-rt="${id}"] [data-day="${d}"]`); if (again) again.focus({ preventScroll: true });
+      return;
+    }
+    const kb = e.target.closest('[data-k="remove"], [data-k="cancel"], [data-k="confirm"]');
+    if (kb) {
+      const id = kb.closest('[data-kid-row]').dataset.kidRow, what = kb.dataset.k;
+      if (what === 'remove') { removing = id; removingAt = Date.now(); renderGrownups(); return; }
+      if (what === 'cancel' || Date.now() - removingAt < 700) { if (what === 'cancel') { removing = null; renderGrownups(); } return; }
+      removing = null;
+      if (dayOffset) setDay(0);
+      kids = kids.filter(k => k.id !== id); saveKids();
+      try { localStorage.removeItem(boardKey(id)); } catch (err) {}
+      if (kid.id === id) { kid = kids[0]; prefs.kid = kid.id; savePrefs(); state = loadBoard(kid.id); run.misses = {}; run.wrong = {}; }
+      if (rtKid === id) rtKid = null;
+      renderTabs(); renderGrownups(); zoomOut({ announce: false });
+      return;
+    }
+    const g = e.target.closest('[data-gp]'); if (!g) return;
+    const a = g.dataset.gp;
+    if (a === 'try') return sayIds(['gen.try']);
+    if (a === 'use-example') { const rk = kids.find(k => k.id === rtKid) || kid; rk.example = false; saveKids(); renderGrownups(); renderAll(); return; }
+    if (a === 'add-kid') {
+      const used = kids.map(k => k.avatar), i = kids.length;
+      kids.push({ id: 'k' + Date.now().toString(36), name: 'Kid ' + (i + 1), avatar: AVATARS.find(x => !used.includes(x)) || AVATARS[0], color: KID_COLORS[i % KID_COLORS.length], school: true, example: false, routine: {} });
+      saveKids(); renderTabs(); renderGrownups(); setCam(currentCam(), true);
+      const inputs = gp.querySelectorAll('[data-k="name"]'); const last = inputs[inputs.length - 1];
+      if (last) { last.focus(); last.select(); }
+      return;
+    }
+    closeOverlay(gpOverlay);
+    if (a === 'tomorrow' || a === 'today') {
+      setDay(a === 'tomorrow' ? dayOffset + 1 : 0);
+      zoomOut({ announce: false }).then(() => sayIds([coachMsgId()]));
+    }
+    if (a === 'empty') {
+      state = emptyState(); save(); run.prompted = false;
+      zoomOut({ announce: false }).then(() => sayIds(['gen.start']));
+    }
+    if (a === 'finish') {
+      state.board = {
+        month: T.m, date: String(T.d), year: T.y, yesterday: (T.wd + 6) % 7, today: T.wd, tomorrow: (T.wd + 1) % 7,
+        season: T.season, temp: (forecast(0) || {}).temp || 'cool', weather: (forecast(0) || {}).weather || 'sunny',
+        activities: todayPlan().length ? todayPlan().map(p => p.id) : [T.wd === 0 || T.wd === 6 ? 'home' : 'school', 'park'],
+        holiday: T.todays ? T.todays.id : 'none', feel: 'happy'
+      };
+      state.setOn = { temp: T.key, weather: T.key, activities: T.key, feel: T.key };
+      state.celebrated = T.key; state.sample = false; save();
+      zoomOut({ announce: false }).then(() => { tada(); confetti(); openReadback(false); });
+    }
+  });
+  gp.addEventListener('change', e => {
+    if (e.target.id === 'dv') { prefs.deviceVoice = e.target.value; savePrefs(); sayIds(['gen.try']); return; }
+    const row = e.target.closest('[data-kid-row]');
+    if (row) {
+      const k = kids.find(x => x.id === row.dataset.kidRow), f = e.target.dataset.k;
+      if (!k) return;
+      if (f === 'name') k.name = cleanName(e.target.value) || k.name;
+      if (f === 'avatar' && AVATARS.includes(e.target.value)) k.avatar = e.target.value;
+      if (f === 'school') k.school = e.target.checked;
+      /* no panel rebuild here: it would swallow the tap that caused the change */
+      saveKids(); renderTabs(); renderAll(); setCam(currentCam(), true);
+      gp.querySelectorAll(`[data-rt-kid="${k.id}"]`).forEach(b => { b.textContent = `${k.avatar} ${k.name}`; });
+      return;
+    }
+    if (e.target.matches('[data-rt-school]')) {
+      const rk = kids.find(k => k.id === rtKid) || kid;
+      const r = rk.routine[e.target.closest('[data-rt]').dataset.rt];
+      if (r) { r.schoolOnly = e.target.checked; rk.example = false; saveKids(); renderAll(); }
+    }
+  });
+  try { speechSynthesis.addEventListener('voiceschanged', () => { if (!gpOverlay.hidden) renderGrownups(); }); } catch (e) {}
+
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Escape') return;
+    if (!gpOverlay.hidden) return closeOverlay(gpOverlay);
+    if (!ahOverlay.hidden) return closeOverlay(ahOverlay);
+    if (!rb.hidden) return closeOverlay(rb);
+    if (run.mode === 'zoom') zoomOut({ announce: false });
+  });
+
+  let rt = 0;
+  addEventListener('resize', () => {
+    clearTimeout(rt);
+    rt = setTimeout(() => { orient(); setCam(currentCam(), true); }, 60);
+  });
+
+  /* The hub may have refreshed (or a grown-up added an event): re-read its data and redraw when it changed */
+  let hubSig = '';
+  const sigOf = () => JSON.stringify([HUB.wx && HUB.wx.ts, hubMembers().map(m => { const d = HUB.data[m.id] || {}; return [d.at, d.calAt, (d.calendar || []).length]; })]);
+  function syncHub() {
+    HUB.cfg = readLS('hub.cfg'); HUB.data = readLS('hub.data') || {}; HUB.wx = readLS('hub.wx');
+    return Promise.all([refreshCalendar(), refreshWeather()]).then(() => {
+      const sig = sigOf();
+      if (sig === hubSig) return;
+      hubSig = sig;
+      if (run.busy || run.lock) return;
+      renderAll();
+      if (run.mode === 'zoom') renderTray();
+      if (!ahOverlay.hidden) renderAhead();
+    });
+  }
+  addEventListener('storage', e => { if (e.key && /^hub\./.test(e.key)) syncHub(); });
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') syncHub(); });
+  addEventListener('pageshow', e => { if (e.persisted) syncHub(); });
+  setInterval(() => { if (document.visibilityState !== 'hidden') syncHub(); }, 5 * 60e3);
+
+  /* A new day re-checks which parts need updating */
+  setInterval(() => {
+    const t = todayInfo(shifted(0));
+    if (t.key === T.key) return;
+    T = t; run.misses = {}; run.wrong = {};
+    if (run.mode === 'zoom') zoomOut({ announce: false }); else { renderAll(); setCam(overviewCam(), true); }
+  }, 60000);
+
+  /* Stars */
+  (() => {
+    let html = '';
+    for (let i = 0; i < 70; i++) {
+      const s = (Math.random() * 2.2 + .8).toFixed(1);
+      html += `<i style="left:${(Math.random() * 100).toFixed(2)}%;top:${(Math.random() * 100).toFixed(2)}%;--s:${s}px;--o:${(Math.random() * .6 + .25).toFixed(2)};--d:${(Math.random() * 3 + 2.5).toFixed(1)}s;--dl:${(Math.random() * 4).toFixed(1)}s"></i>`;
+    }
+    $('#stars').innerHTML = html;
+  })();
+
+  /* Boot */
+  load();
+  orient();
+  renderTabs();
+  try { renderAll(); } catch (e) { state = sampleState(); renderAll(); }
+  /* fresh calendar and weather from the hub's sources, then redraw what depends on them */
+  hubSig = sigOf();
+  syncHub();
+  setCam(overviewCam(), true);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => setCam(currentCam(), true));
+})();
+</script>
+</body>
+</html>

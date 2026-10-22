@@ -1,0 +1,19 @@
+{
+  "name": "My Daily Calendar",
+  "short_name": "Calendar",
+  "description": "The kids' morning calendar board: date, weather, plans and feelings, with a voice.",
+  "start_url": "calendar.html",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "any",
+  "background_color": "#1a0a2e",
+  "theme_color": "#1a0a2e",
+  "icons": [
+    {
+      "src": "calendar-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
